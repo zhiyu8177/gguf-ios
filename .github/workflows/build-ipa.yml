@@ -4,6 +4,9 @@ on:
   push:
     branches: [master]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-14
@@ -52,3 +55,12 @@ jobs:
         with:
           name: GGUFApp-ipa
           path: GGUFApp.ipa
+
+      - name: Upload IPA to Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG=v$(date +%s)
+          gh release create "$TAG" GGUFApp.ipa --title "GGUFApp build" --notes "Auto build $(date)" --repo zhiyu8177/gguf-ios
+          echo "RELEASE_TAG=$TAG"
