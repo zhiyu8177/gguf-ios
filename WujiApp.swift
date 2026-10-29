@@ -153,7 +153,18 @@ class Coordinator: NSObject, WKScriptMessageHandler {
 
         let engine = AVAudioEngine()
         let node = engine.inputNode
-        let fmt = node.outputFormat(forBus: 0)
+        var tapFormat = node.outputFormat(forBus: 0)
+        // inputNode 格式异常（sampleRate==0）时直接 installTap 会崩溃：用会话采样率兜底
+        if tapFormat.sampleRate == 0 || tapFormat.channelCount == 0 {
+            let sr = AVAudioSession.sharedInstance().sampleRate > 0
+                ? AVAudioSession.sharedInstance().sampleRate : 16000
+            guard let f = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1) else {
+                reply(pendingID, false, "{\"error\":\"bad format\"}")
+                return
+            }
+            tapFormat = f
+        }
+        let fmt = tapFormat
         node.installTap(onBus: 0, bufferSize: 1024, format: fmt) { buffer, _ in
             request.append(buffer)
         }
