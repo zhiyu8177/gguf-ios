@@ -1,0 +1,15 @@
+== 拾壹包内文件 ==
+0	Payload/
+0	Payload/Shiyi.app/
+217192	Payload/Shiyi.app/Shiyi
+28413	Payload/Shiyi.app/index.html
+1170	Payload/Shiyi.app/Info.plist
+8	Payload/Shiyi.app/PkgInfo
+== 可执行: Payload/Shiyi.app/PkgInfo ==
+magic hex: 4150504c3f3f3f3f
+== 拾壹 Info.plist 关键键 ==
+CFBundleIdentifier = com.shiyi.app
+CFBundleExecutable = Shiyi
+MinimumOSVersion = 14.0
+UIDeviceFamily = [1]
+LSRequiresIPhoneOS = True

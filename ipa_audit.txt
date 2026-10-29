@@ -1,0 +1,39 @@
+== 包内文件 ==
+0	Payload/
+0	Payload/GGUFApp.app/
+13583	Payload/GGUFApp.app/index.html
+136480	Payload/GGUFApp.app/GGUFApp
+1271	Payload/GGUFApp.app/Info.plist
+8	Payload/GGUFApp.app/PkgInfo
+== Info.plist 全键值 ==
+BuildMachineOSBuild = 23J631
+CFBundleDevelopmentRegion = zh_CN
+CFBundleDisplayName = GGUF
+CFBundleExecutable = GGUFApp
+CFBundleIdentifier = com.gguf.workbench
+CFBundleInfoDictionaryVersion = 6.0
+CFBundleName = GGUFApp
+CFBundlePackageType = APPL
+CFBundleShortVersionString = 1.0
+CFBundleSupportedPlatforms = ['iPhoneOS']
+CFBundleVersion = 1
+DTCompiler = com.apple.compilers.llvm.clang.1_0
+DTPlatformBuild = 21F77
+DTPlatformName = iphoneos
+DTPlatformVersion = 17.5
+DTSDKBuild = 21F77
+DTSDKName = iphoneos17.5
+DTXcode = 1540
+DTXcodeBuild = 15F31d
+LSRequiresIPhoneOS = True
+MinimumOSVersion = 15.0
+NSAppTransportSecurity = {'NSAllowsArbitraryLoads': True}
+NSLocalNetworkUsageDescription = GGUF需要连接局域网/蒲公英组网里的电脑来运行本地大模型
+NSMicrophoneUsageDescription = 按住说话需要麦克风录音，用于本机语音识别
+NSSpeechRecognitionUsageDescription = 语音输入需要本机语音识别，识别结果仅发送给你自己的电脑用于大模型对话
+UIDeviceFamily = [1, 2]
+UILaunchScreen = {}
+UIRequiredDeviceCapabilities = ['arm64']
+UISupportedInterfaceOrientations = ['UIInterfaceOrientationPortrait']
+== 可执行文件架构 ==
+thin ARM64e

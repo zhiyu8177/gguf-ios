@@ -1,0 +1,4 @@
+包内index.html长度=12873
+源码index.html长度=12612
+内容一致=False
+包内SERVER地址行: var DEFAULT_SERVER='http://172.16.2.248:8000';

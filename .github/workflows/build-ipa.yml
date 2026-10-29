@@ -5,41 +5,46 @@ on:
 jobs:
   build:
     runs-on: macos-14
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
-      - name: 安装 XcodeGen（手册约定锁 2.42.0，失败则用最新）
+      - name: Install XcodeGen (pinned 2.42.0, same as Shiyi)
         run: |
-          brew install xcodegen || true
+          set -e
+          curl -fsSL -o /tmp/xcodegen.zip https://github.com/yonaskolb/XcodeGen/releases/download/2.42.0/xcodegen.zip
+          unzip -q /tmp/xcodegen.zip -d /tmp
+          sudo mv /tmp/xcodegen/bin/xcodegen /usr/local/bin/xcodegen
           xcodegen --version
 
-      - name: 生成工程
-        run: xcodegen generate
-
-      - name: objectVersion 降级兜底（Xcode16 格式 → Xcode15 可读）
+      - name: Generate Xcode project
         run: |
-          if grep -q "objectVersion = 77" GGUFApp.xcodeproj/project.pbxproj; then
-            sed -i '' 's/objectVersion = 77/objectVersion = 56/' GGUFApp.xcodeproj/project.pbxproj
-          fi
+          xcodegen generate
+          # 兜底：若仍是 Xcode16 格式(77)，降到 Xcode15 可读的 56
+          sed -i '' 's/objectVersion = 77;/objectVersion = 56;/' GGUFApp.xcodeproj/project.pbxproj || true
 
-      - name: 免签名编译（装包靠 TrollStore）
+      - name: Build for device (unsigned, TrollStore)
         run: |
+          set -o pipefail
           xcodebuild build \
             -project GGUFApp.xcodeproj \
             -scheme GGUFApp \
-            -sdk iphoneos \
             -configuration Release \
+            -sdk iphoneos \
             -derivedDataPath build \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild.log
+          tail -20 xcodebuild.log
 
-      - name: 打包 IPA
+      - name: Create IPA
         run: |
+          set -e
+          cd build/Build/Products/Release-iphoneos
           mkdir -p Payload
-          cp -R "build/Build/Products/Release-iphoneos/GGUFApp.app" Payload/
-          chmod 755 "Payload/GGUFApp.app/GGUFApp"
-          zip -r GGUFApp.ipa Payload
+          cp -r GGUFApp.app Payload/
+          zip -r ../../../../GGUFApp.ipa Payload
 
       - uses: actions/upload-artifact@v4
         with:

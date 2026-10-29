@@ -15,24 +15,34 @@ struct GGUFApp: App {
 }
 
 struct ContentView: View {
-    var body: some View { WebViewContainer() }
+    @StateObject private var holder = BridgeHolder()
+    var body: some View {
+        WebViewContainer(bridge: holder.bridge).edgesIgnoringSafeArea(.all)
+    }
+}
+
+/// 用 @StateObject 强持有原生桥，避免 SwiftUI 提前释放 Coordinator
+/// 导致启动后 JS 调原生桥（health）时野指针闪退（拾壹同款模式）
+final class BridgeHolder: ObservableObject {
+    let bridge = Coordinator()
 }
 
 struct WebViewContainer: UIViewRepresentable {
+    let bridge: Coordinator
     func makeUIView(context: Context) -> WKWebView {
         let cfg = WKWebViewConfiguration()
-        cfg.userContentController.add(context.coordinator, name: "api")
+        cfg.userContentController.add(bridge, name: "api")
         cfg.allowsInlineMediaPlayback = true
         let wv = WKWebView(frame: .zero, configuration: cfg)
         wv.scrollView.bounces = false
-        context.coordinator.webView = wv
+        bridge.webView = wv
         if let url = Bundle.main.url(forResource: "index", withExtension: "html") {
             wv.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
         }
         return wv
     }
     func updateUIView(_ uiView: WKWebView, context: Context) {}
-    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeCoordinator() -> Coordinator { bridge }
 }
 
 /// 原生桥：JS 调 window.webkit.messageHandlers.api.postMessage({action,id,...})
