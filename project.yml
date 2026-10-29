@@ -2,7 +2,7 @@ name: GGUFApp
 options:
   bundleIdPrefix: com.gguf
   deploymentTarget:
-    iOS: "15.0"
+    iOS: "14.0"
 targets:
   GGUFApp:
     type: application
@@ -22,4 +22,4 @@ targets:
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGNING_ALLOWED: NO
         TARGETED_DEVICE_FAMILY: "1,2"
-        IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "14.0"

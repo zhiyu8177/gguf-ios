@@ -1,0 +1,4 @@
+total cmds=49
+has_chained_fixups(0x80000033)=True
+has_exports_trie(0x80000034)=True
+has_old_exports(0x8000001c)=False
