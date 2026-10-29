@@ -43,18 +43,45 @@ jobs:
             | tee xcodebuild.log
           tail -20 xcodebuild.log
 
+      - name: Build GGUFTest (bisect, same code as Shiyi)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project GGUFApp.xcodeproj \
+            -scheme GGUFTest \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild_test.log
+          tail -20 xcodebuild_test.log
+
       - name: Create IPA
         run: |
           set -e
           cd build/Build/Products/Release-iphoneos
+          ls -l
           mkdir -p Payload
           cp -r GGUFApp.app Payload/
+          ls -l Payload/GGUFApp.app
           zip -r ../../../../GGUFApp.ipa Payload
+          rm -rf Payload
+          mkdir -p Payload
+          cp -r GGUFTest.app Payload/
+          ls -l Payload/GGUFTest.app
+          zip -r ../../../../GGUFTest.ipa Payload
 
       - uses: actions/upload-artifact@v4
         with:
           name: GGUFApp-ipa
           path: GGUFApp.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GGUFTest-ipa
+          path: GGUFTest.ipa
 
       - name: Upload IPA to Release
         env:
@@ -62,5 +89,5 @@ jobs:
         run: |
           set -e
           TAG=v$(date +%s)
-          gh release create "$TAG" GGUFApp.ipa --title "GGUFApp build" --notes "Auto build $(date)" --repo zhiyu8177/gguf-ios
+          gh release create "$TAG" GGUFApp.ipa GGUFTest.ipa --title "GGUFApp build" --notes "Auto build $(date)" --repo zhiyu8177/gguf-ios
           echo "RELEASE_TAG=$TAG"

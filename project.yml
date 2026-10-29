@@ -23,3 +23,21 @@ targets:
         CODE_SIGNING_ALLOWED: NO
         TARGETED_DEVICE_FAMILY: "1,2"
         IPHONEOS_DEPLOYMENT_TARGET: "14.0"
+  GGUFTest:
+    type: application
+    platform: iOS
+    sources:
+      - path: GGUFTest
+        excludes:
+          - "Info.plist"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.gguf.test
+        PRODUCT_NAME: GGUFTest
+        INFOPLIST_FILE: GGUFTest/Info.plist
+        SWIFT_VERSION: "5.9"
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        IPHONEOS_DEPLOYMENT_TARGET: "14.0"

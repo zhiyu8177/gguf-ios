@@ -1,0 +1,3 @@
+﻿GGUFTestApp.swift  24452B
+index.html  32540B
+Info.plist  1473B
