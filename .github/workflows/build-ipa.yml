@@ -40,6 +40,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
+            OTHER_LDFLAGS="-ld_classic" \
             | tee xcodebuild.log
           tail -20 xcodebuild.log
 

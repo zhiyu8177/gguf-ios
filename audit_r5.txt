@@ -1,0 +1,6 @@
+arch: thin ARM64e
+CFBundleIdentifier = com.gguf.workbench
+CFBundleExecutable = GGUFApp
+LSRequiresIPhoneOS = True
+MinimumOSVersion = 15.0
+files: Payload/GGUFApp.app/, Payload/GGUFApp.app/index.html, Payload/GGUFApp.app/GGUFApp, Payload/GGUFApp.app/Info.plist, Payload/GGUFApp.app/PkgInfo

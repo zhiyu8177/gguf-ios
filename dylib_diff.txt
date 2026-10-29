@@ -1,0 +1,28 @@
+== Run#1 依赖 ==
+/System/Library/Frameworks/Foundation.framework/Foundation
+/usr/lib/libobjc.A.dylib
+/usr/lib/libSystem.B.dylib
+/System/Library/Frameworks/AVFAudio.framework/AVFAudio
+/System/Library/Frameworks/Speech.framework/Speech
+/System/Library/Frameworks/SwiftUI.framework/SwiftUI
+/System/Library/Frameworks/WebKit.framework/WebKit
+/usr/lib/libc++.1.dylib
+/usr/lib/swift/libswiftCore.dylib
+/usr/lib/swift/libswiftDispatch.dylib
+/usr/lib/swift/libswiftFoundation.dylib
+== Run#5 依赖 ==
+/System/Library/Frameworks/Foundation.framework/Foundation
+/usr/lib/libobjc.A.dylib
+/usr/lib/libSystem.B.dylib
+/System/Library/Frameworks/AVFAudio.framework/AVFAudio
+/System/Library/Frameworks/Combine.framework/Combine
+/System/Library/Frameworks/Speech.framework/Speech
+/System/Library/Frameworks/SwiftUI.framework/SwiftUI
+/System/Library/Frameworks/WebKit.framework/WebKit
+/usr/lib/libc++.1.dylib
+/usr/lib/swift/libswiftCore.dylib
+/usr/lib/swift/libswiftDispatch.dylib
+/usr/lib/swift/libswiftFoundation.dylib
+== 仅Run#5有 ==
+/System/Library/Frameworks/Combine.framework/Combine
+== 仅Run#1有 ==
