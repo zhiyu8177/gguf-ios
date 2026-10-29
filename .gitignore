@@ -1,0 +1,4 @@
+﻿backup_*
+venv/
+.DS_Store
+

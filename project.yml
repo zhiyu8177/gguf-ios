@@ -1,0 +1,19 @@
+name: GGUFApp
+options:
+  bundleIdPrefix: com.gguf
+targets:
+  GGUFApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: WujiApp.swift
+      - path: index.html
+      - path: Info.plist
+        buildPhase: none
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.gguf.workbench
+        INFOPLIST_FILE: Info.plist
+        TARGETED_DEVICE_FAMILY: "1,2"
+        IPHONEOS_DEPLOYMENT_TARGET: "15.0"

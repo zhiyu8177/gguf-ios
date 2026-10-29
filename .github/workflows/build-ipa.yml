@@ -1,0 +1,47 @@
+name: Build IPA
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 XcodeGen（手册约定锁 2.42.0，失败则用最新）
+        run: |
+          brew install xcodegen || true
+          xcodegen --version
+
+      - name: 生成工程
+        run: xcodegen generate
+
+      - name: objectVersion 降级兜底（Xcode16 格式 → Xcode15 可读）
+        run: |
+          if grep -q "objectVersion = 77" GGUFApp.xcodeproj/project.pbxproj; then
+            sed -i '' 's/objectVersion = 77/objectVersion = 56/' GGUFApp.xcodeproj/project.pbxproj
+          fi
+
+      - name: 免签名编译（装包靠 TrollStore）
+        run: |
+          xcodebuild build \
+            -project GGUFApp.xcodeproj \
+            -scheme GGUFApp \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: 打包 IPA
+        run: |
+          mkdir -p Payload
+          cp -R "build/Build/Products/Release-iphoneos/GGUFApp.app" Payload/
+          chmod 755 "Payload/GGUFApp.app/GGUFApp"
+          zip -r GGUFApp.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GGUFApp-ipa
+          path: GGUFApp.ipa
