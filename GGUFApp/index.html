@@ -171,7 +171,7 @@
   </div>
   <div class="statusline">
     <span class="dot" id="dot"></span>
-    <span id="status">正在连接电脑…</span>
+    <span id="status" title="点我改电脑地址">正在连接电脑…</span>
   </div>
 </header>
 
@@ -211,11 +211,12 @@
    ========================================================= */
 /* 电脑地址候选（换了电脑/换了组网IP 只改这里，不用重编壳）：
    浏览器直接打开时用同源地址；App 里是 file:// → 按顺序自动探测，谁通用谁 */
-const API_LIST = [
+/* 用户手动填的电脑地址（手机上点"连接异常/连不上电脑"红字可填写；本地保存，不用重装） */
+const CUSTOM = localStorage.getItem("gguf_server");
+const API_LIST = (CUSTOM ? [CUSTOM] : []).concat([
   "http://172.16.2.248:8000",   // 本机（至强）蒲公英地址 · GGUF 8000
-  "http://192.168.1.8:8000",    // 手机与电脑同一 WiFi 时直连
-  "http://172.16.2.248:8000"    // 兜底（蒲公英）
-];
+  "http://192.168.1.8:8000"     // 手机与电脑同一 WiFi 时直连
+]);
 let API = (location.protocol === "http:" || location.protocol === "https:")
   ? location.origin
   : API_LIST[0];
@@ -348,6 +349,15 @@ const log = $("log"), main = $("main"), input = $("input");
 const btnSend = $("btnSend"), btnMic = $("btnMic"), btnWho = $("btnWho");
 const btnCheck = $("btnCheck"), btnClear = $("btnClear");
 const statusEl = $("status"), dot = $("dot");
+/* 点状态条 → 手动填电脑地址（存本地，立即重连） */
+statusEl.addEventListener("click", function () {
+  const cur = localStorage.getItem("gguf_server") || API_LIST[0];
+  const v = prompt("电脑地址（如 http://172.16.2.248:8000），留空用自动探测", cur);
+  if (v === null) return;
+  if (v.trim()) localStorage.setItem("gguf_server", v.trim());
+  else localStorage.removeItem("gguf_server");
+  location.reload();
+});
 const overlay = $("overlay"), ovTip = $("ovTip"), wave = $("wave");
 const toastEl = $("toast"), whoTitle = $("whoTitle"), whoSub = $("whoSub"), avatar = $("avatar");
 
