@@ -1,1 +1,1 @@
-https://github.com/zhiyu8177/gguf-ios/releases/download/v1793319056/GGUFApp.ipa  39465B
+https://github.com/zhiyu8177/gguf-ios/releases/download/v1793320329/GGUFApp.ipa  39640B
