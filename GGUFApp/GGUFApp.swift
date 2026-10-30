@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 import AVFoundation
+import Speech
 import UIKit
 
 // 电脑端服务地址候选（蒲公英组网 IP 变了不用重编壳：启动后自动探测，谁通用谁）
@@ -54,21 +55,23 @@ private func jsLiteral(_ s: String) -> String {
     return String(arr.dropFirst().dropLast())
 }
 
-// ---------------- 原生桥：接口请求 + 录音 + 朗读 ----------------
+// ---------------- 原生桥：接口请求 + 本地语音识别 + 朗读 ----------------
 final class NativeBridge: NSObject, WKScriptMessageHandler,
-                          AVAudioRecorderDelegate, AVAudioPlayerDelegate {
+                          AVAudioPlayerDelegate {
 
     weak var webView: WKWebView?
 
-    private var recorder: AVAudioRecorder?
-    private var audioURL: URL?
-    private var recordStartedAt: Date?
-    private var cancelRequested = false
+    // ---- iOS 本机语音识别（SFSpeech，音频不出手机）----
+    private var audioEngine: AVAudioEngine?
+    private var speechRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var speechTask: SFSpeechRecognitionTask?
+    private var speechGranted = false
+    private var speechFinished = false
 
     private var player: AVAudioPlayer?
     private var ttsLoading = false
 
-    // ========== 消息入口：api（接口） / voice（录音） ==========
+    // ========== 消息入口：api（接口） / voice（按住说话） ==========
     func userContentController(_ controller: WKUserContentController,
                                didReceive message: WKScriptMessage) {
         if message.name == "voice" {
@@ -342,62 +345,28 @@ final class NativeBridge: NSObject, WKScriptMessageHandler,
         }
     }
 
-    // ========== 录音（16k 单声道 WAV，FunASR 直接吃） ==========
+    // ========== 按住说话：iOS 本机 SFSpeech 识别（音频不出手机，豆包式） ==========
     private func startRecording() {
-        if recorder != nil { return }
+        if audioEngine != nil { return }
         stopPlayback()
-
-        let session = AVAudioSession.sharedInstance()
+        speechFinished = false
         let begin: () -> Void = { [weak self] in
             guard let self = self else { return }
-            do {
-                try session.setCategory(.playAndRecord, mode: .default,
-                                        options: [.defaultToSpeaker, .allowBluetooth])
-                try session.setActive(true, options: [])
-            } catch {
-                self.status("录音设备被占用", "err")
-                self.rejectRecording("音频初始化失败")
-                return
-            }
-
-            let settings: [String: Any] = [
-                AVFormatIDKey: Int(kAudioFormatLinearPCM),
-                AVSampleRateKey: 16000.0,
-                AVNumberOfChannelsKey: 1,
-                AVLinearPCMBitDepthKey: 16,
-                AVLinearPCMIsFloatKey: false,
-                AVLinearPCMIsBigEndianKey: false
-            ]
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("shiyi_voice.wav")
-            try? FileManager.default.removeItem(at: url)
-            do {
-                let rec = try AVAudioRecorder(url: url, settings: settings)
-                rec.delegate = self
-                rec.isMeteringEnabled = true
-                rec.record()
-                self.recorder = rec
-                self.audioURL = url
-                self.recordStartedAt = Date()
-                self.cancelRequested = false
-                self.status("正在听…", "warn")
-            } catch {
-                self.status("录音启动失败", "err")
-                self.rejectRecording("录音启动失败")
-            }
+            self.startListening()
         }
-
-        if #available(iOS 17.0, *) {
-            AVAudioApplication.requestRecordPermission { granted in
-                DispatchQueue.main.async {
-                    if granted { begin() } else { self.denied() }
+        if speechGranted {
+            DispatchQueue.main.async { begin() }
+            return
+        }
+        SFSpeechRecognizer.requestAuthorization { status in
+            self.speechGranted = (status == .authorized)
+            DispatchQueue.main.async {
+                if !self.speechGranted {
+                    self.status("语音识别权限被拒绝", "err")
+                    self.rejectRecording("请在 设置→GGUF 里打开语音识别与麦克风权限")
+                    return
                 }
-            }
-        } else {
-            session.requestRecordPermission { granted in
-                DispatchQueue.main.async {
-                    if granted { begin() } else { self.denied() }
-                }
+                begin()
             }
         }
     }
@@ -412,74 +381,102 @@ final class NativeBridge: NSObject, WKScriptMessageHandler,
     }
 
     private func stopRecording(cancel: Bool) {
-        guard let rec = recorder else { return }
-        cancelRequested = cancel
-        rec.stop()
-        recorder = nil
-    }
-
-    func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
-        defer { recordStartedAt = nil }
-        let url = audioURL
-        let elapsed = recordStartedAt.map { Date().timeIntervalSince($0) } ?? 0
-
-        if cancelRequested {
-            cancelRequested = false
-            status("已取消", "")
+        if cancel { stopEngine(); return }
+        guard let request = speechRequest else {
+            stopEngine()
+            rejectRecording("没有正在录制的语音")
             return
         }
-        guard flag, let url = url else {
-            status("录音失败", "err")
-            rejectRecording("录音失败，请重试")
-            return
-        }
-        if elapsed < 0.5 {
-            status("说话时间太短", "warn")
-            rejectRecording("说话时间太短")
-            return
-        }
-        upload(url)
-    }
-
-    private func upload(_ url: URL) {
         status("识别中…", "warn")
-        guard let endpoint = URL(string: SERVER + "/asr") else {
-            rejectRecording("地址错误"); return
+        speechFinished = false
+        request.endAudio()
+        // 松手后 8 秒内识别回调未触发则兜底返回
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8) { [weak self] in
+            guard let self = self, !self.speechFinished else { return }
+            self.speechFinished = true
+            self.stopEngine()
+            self.rejectRecording("识别超时，再说一次")
         }
-        var req = URLRequest(url: endpoint)
-        req.httpMethod = "POST"
-        req.setValue("audio/wav", forHTTPHeaderField: "Content-Type")
-        req.timeoutInterval = 180
+    }
 
-        URLSession.shared.uploadTask(with: req, fromFile: url) { [weak self] data, resp, err in
-            DispatchQueue.main.async {
-                guard let self = self else { return }
-                if let err = err {
-                    self.status("识别失败", "err")
-                    self.rejectRecording("连不上电脑：\(err.localizedDescription)")
-                    return
-                }
-                guard let data = data,
-                      let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    self.status("识别失败", "err")
-                    self.rejectRecording("电脑返回异常")
-                    return
-                }
-                if let e = obj["error"] as? String, !e.isEmpty {
-                    self.status("识别失败", "err")
-                    self.rejectRecording(e)
-                    return
-                }
-                let text = (obj["text"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-                if text.isEmpty {
-                    self.status("没听清", "warn")
-                    self.rejectRecording("没听清，再说一次")
-                    return
-                }
-                self.status("已识别", "ok")
-                self.eval("window.__shiyiAsr && window.__shiyiAsr(\(jsLiteral(text)), true, '');")
+    /// 启动本机识别（AVAudioEngine 采集 + SFSpeech 中文识别）
+    private func startListening() {
+        stopEngine()
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playAndRecord,
+                                                            mode: .default,
+                                                            options: [.defaultToSpeaker, .allowBluetooth])
+            try AVAudioSession.sharedInstance().setActive(true, options: [])
+        } catch {
+            status("音频初始化失败", "err")
+            rejectRecording("音频初始化失败")
+            return
+        }
+        guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN")),
+              recognizer.isAvailable else {
+            status("本机识别不可用", "err")
+            rejectRecording("本机语音识别不可用")
+            return
+        }
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        speechRequest = request
+
+        let engine = AVAudioEngine()
+        let node = engine.inputNode
+        var fmt = node.outputFormat(forBus: 0)
+        // inputNode 格式异常（sampleRate==0）时直接 installTap 会崩溃：用会话采样率兜底
+        if fmt.sampleRate == 0 || fmt.channelCount == 0 {
+            let sr = AVAudioSession.sharedInstance().sampleRate > 0
+                ? AVAudioSession.sharedInstance().sampleRate : 16000
+            guard let f = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1) else {
+                rejectRecording("音频格式异常")
+                return
             }
-        }.resume()
+            fmt = f
+        }
+        node.installTap(onBus: 0, bufferSize: 1024, format: fmt) { buffer, _ in
+            request.append(buffer)
+        }
+        engine.prepare()
+        do {
+            try engine.start()
+            audioEngine = engine
+            speechTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+                guard let self = self else { return }
+                DispatchQueue.main.async {
+                    if self.speechFinished { return }
+                    if result?.isFinal == true || error != nil {
+                        self.speechFinished = true
+                        let text = result?.bestTranscription.formattedString
+                            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        self.stopEngine()
+                        if !text.isEmpty {
+                            self.status("已识别", "ok")
+                            self.eval("window.__shiyiAsr && window.__shiyiAsr(\(self.jsLiteral(text)), true, '');")
+                        } else {
+                            self.status("没听清", "warn")
+                            self.rejectRecording("没听清，再说一次")
+                        }
+                    }
+                }
+            }
+            status("正在听…", "warn")
+        } catch {
+            stopEngine()
+            status("识别启动失败", "err")
+            rejectRecording("识别启动失败")
+        }
+    }
+
+    private func stopEngine() {
+        if let t = speechTask { t.cancel(); speechTask = nil }
+        speechRequest = nil
+        if let e = audioEngine {
+            e.stop()
+            e.inputNode.removeTap(onBus: 0)
+            audioEngine = nil
+        }
     }
 }
 

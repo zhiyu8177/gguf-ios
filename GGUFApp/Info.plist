@@ -32,7 +32,9 @@
 		<true/>
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>GGUF需要麦克风权限进行语音输入，音频只在你的电脑上本地识别，不上传云端</string>
+	<string>GGUF按住说话需要麦克风采集声音，识别在iPhone本机完成，音频不出手机、不上传云端</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>GGUF按住说话使用iPhone本机语音识别，把你说的话转成文字发送给你自己的电脑</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>
