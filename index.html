@@ -57,7 +57,7 @@ body{background:radial-gradient(1200px 700px at 70% -10%,#0a1a30 0%,#050b16 55%,
 <script>
 /* ===== 服务地址 =====
    默认蒲公英 IP + GGUF 8000；连不上会引导修改（存 localStorage）。 */
-var DEFAULT_SERVER='http://172.16.2.248:8000';
+var DEFAULT_SERVER='http://172.16.2.103:8000';
 var SERVER_IP=DEFAULT_SERVER,TOKEN='';
 /* about: 协议（loadHTMLString）下访问 localStorage 会抛异常，必须包 try/catch */
 try{SERVER_IP=(localStorage.getItem('gguf_ip')||'').trim()||DEFAULT_SERVER;TOKEN=(localStorage.getItem('gguf_token')||'').trim();}catch(e){}
