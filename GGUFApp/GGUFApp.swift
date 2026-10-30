@@ -453,7 +453,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler,
                         self.stopEngine()
                         if !text.isEmpty {
                             self.status("已识别", "ok")
-                            self.eval("window.__shiyiAsr && window.__shiyiAsr(\(self.jsLiteral(text)), true, '');")
+                            self.eval("window.__shiyiAsr && window.__shiyiAsr(\(jsLiteral(text)), true, '');")
                         } else {
                             self.status("没听清", "warn")
                             self.rejectRecording("没听清，再说一次")
