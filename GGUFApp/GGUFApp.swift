@@ -6,7 +6,7 @@ import UIKit
 
 // 电脑端服务地址候选（蒲公英组网 IP 变了不用重编壳：启动后自动探测，谁通用谁）
 private let SERVER_CANDIDATES = [
-    "http://172.16.2.248:8000",  // 本机（至强）蒲公英地址 · GGUF 8000
+    "http://172.16.2.103:8000",  // 本机（至强）蒲公英地址 · GGUF 8000（172.16.2.248 有线网卡已断，2026-10-30 换为 VPN 卡地址）
     "http://192.168.1.8:8000",   // 手机与电脑同一 WiFi 时直连
 ]
 private var SERVER = SERVER_CANDIDATES[0]
