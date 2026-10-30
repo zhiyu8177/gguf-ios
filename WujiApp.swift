@@ -37,10 +37,11 @@ struct WebViewContainer: UIViewRepresentable {
         wv.scrollView.bounces = false
         bridge.webView = wv
         // iOS 16.0.x 的 WKWebView 对 loadFileURL 有已知崩溃问题，
-        // 改为 loadHTMLString（内容不变），绕开该路径
+        // 改为 loadHTMLString（内容不变），绕开该路径；baseURL 用服务地址：
+        // 同源 fetch 免 CORS + localStorage 可用（about: 下两者都会出问题）
         if let url = Bundle.main.url(forResource: "index", withExtension: "html"),
            let html = try? String(contentsOf: url, encoding: .utf8) {
-            wv.loadHTMLString(html, baseURL: nil)
+            wv.loadHTMLString(html, baseURL: URL(string: SERVER))
         }
         return wv
     }
