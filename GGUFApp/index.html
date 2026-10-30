@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="format-detection" content="telephone=no">
-<title>拾壹 · 本地 Agent</title>
+<title>GGUF · 本地 Agent</title>
 <style>
   :root {
     --bg: #F5F4F1; --card: #FFFFFF; --line: #E2E0DA;
@@ -162,8 +162,8 @@
   <div class="hrow">
     <div class="avatar" id="avatar">壹</div>
     <div class="titles">
-      <h1 id="whoTitle">拾壹</h1>
-      <div class="sub" id="whoSub">总管 · 推理在本机 · 只监听本机</div>
+      <h1 id="whoTitle">GGUF</h1>
+      <div class="sub" id="whoSub">GGUF · 推理在本机 · 零Token消耗</div>
     </div>
     <button class="iconbtn" id="btnWho" title="切换对话对象">贰</button>
     <button class="iconbtn" id="btnCheck" title="检查模型">检</button>
@@ -178,7 +178,7 @@
 <main id="main">
   <div class="wrap" id="log">
     <div class="empty">
-      <b>拾壹在这儿</b>
+      <b>GGUF 在这儿</b>
       按住右下角话筒说话，松手即识别<br>
       也可以直接打字，回车发送
     </div>
@@ -551,7 +551,7 @@ function showAlert(it) {
   meta.className = "meta";
   const ask = document.createElement("button");
   ask.className = "speak";
-  ask.textContent = "问拾壹";
+  ask.textContent = "问 GGUF";
   ask.onclick = function () {
     input.value = "刚才这条提醒我看到了，现在该怎么办？";
     send();
@@ -624,15 +624,11 @@ function startAlertPolling() {
 
 function setMode(m) {
   mode = m;
-  const isShier = m === "shier";
-  whoTitle.textContent = isShier ? "拾贰" : "拾壹";
-  avatar.textContent = isShier ? "贰" : "壹";
-  whoSub.textContent = isShier
-    ? "长工 · 干活专用 · 只有基础工具"
-    : "总管 · 推理在本机 · 只监听本机";
-  btnWho.textContent = isShier ? "壹" : "贰";
-  btnWho.title = isShier ? "切回拾壹" : "切到拾贰";
-  input.placeholder = isShier ? "给拾贰派活，回车发送" : "输入问题，回车发送";
+  whoTitle.textContent = "GGUF";
+  avatar.textContent = "壹";
+  whoSub.textContent = "GGUF · 推理在本机 · 零Token消耗";
+  btnWho.style.display = "none";
+  input.placeholder = "输入问题，回车发送";
 }
 btnWho.onclick = function () { setMode(mode === "shier" ? "shiyi" : "shier"); };
 
@@ -704,7 +700,7 @@ btnCheck.onclick = async function () {
   try {
     await call("health", {});
     setStatus("电脑在线 · " + ((Date.now() - t0) / 1000).toFixed(1) + "s", "ok");
-    toast("拾壹在线，可以说话");
+    toast("GGUF 在线，可以说话");
   } catch (e) {
     setStatus("连不上电脑", "err");
     toast("连不上：检查 8000 服务与网络");
