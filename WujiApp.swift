@@ -3,9 +3,9 @@ import WebKit
 import AVFoundation
 import Speech
 
-/// GGUF 工作台手机壳：电脑的蒲公英虚拟 IP（172.16.2.248）· GGUF 8000 端口
+/// GGUF 工作台手机壳：电脑的蒲公英虚拟 IP（172.16.2.103）· GGUF 8000 端口
 /// 换 IP 只改这一处 + ios/index.html 里的 DEFAULT_SERVER
-let SERVER = "http://172.16.2.248:8000"
+let SERVER = "http://172.16.2.103:8000"
 
 @main
 struct GGUFApp: App {
