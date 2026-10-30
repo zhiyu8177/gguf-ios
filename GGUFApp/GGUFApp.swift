@@ -381,7 +381,12 @@ final class NativeBridge: NSObject, WKScriptMessageHandler,
     }
 
     private func stopRecording(cancel: Bool) {
-        if cancel { stopEngine(); return }
+        if cancel {
+            // 上移取消：静默停止，不弹"没听清"
+            speechFinished = true
+            stopEngine()
+            return
+        }
         guard let request = speechRequest else {
             stopEngine()
             rejectRecording("没有正在录制的语音")
