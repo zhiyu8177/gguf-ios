@@ -127,15 +127,15 @@ final class NativeBridge: NSObject, WKScriptMessageHandler,
     }
 
     private func resolve(_ id: Int, _ data: [String: Any]) {
-        eval("window.__shiyiCb && window.__shiyiCb(\(id), \(jsLiteral(jsonString(["ok": true, "data": data]))));")
+        eval("window.__ggufCb && window.__ggufCb(\(id), \(jsLiteral(jsonString(["ok": true, "data": data]))));")
     }
 
     private func reject(_ id: Int, _ message: String) {
-        eval("window.__shiyiCb && window.__shiyiCb(\(id), \(jsLiteral(jsonString(["ok": false, "error": message]))));")
+        eval("window.__ggufCb && window.__ggufCb(\(id), \(jsLiteral(jsonString(["ok": false, "error": message]))));")
     }
 
     private func status(_ text: String, _ level: String = "") {
-        eval("window.__shiyiStatus && window.__shiyiStatus(\(jsLiteral(text)), \(jsLiteral(level)));")
+        eval("window.__ggufStatus && window.__ggufStatus(\(jsLiteral(text)), \(jsLiteral(level)));")
     }
 
     // ========== HTTP ==========
@@ -281,7 +281,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler,
         let payload: [String: Any] = [
             "text": text,
             "session_id": params["session"] as? String ?? "",
-            "to": params["to"] as? String ?? "shiyi"
+            "to": params["to"] as? String ?? "gguf"
         ]
         post("/chat", json: payload) { [weak self] data, code, err in
             guard let self = self else { return }
@@ -341,7 +341,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler,
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         DispatchQueue.main.async {
             self.player = nil
-            self.eval("window.__shiyiTtsDone && window.__shiyiTtsDone();")
+            self.eval("window.__ggufTtsDone && window.__ggufTtsDone();")
         }
     }
 
@@ -373,11 +373,11 @@ final class NativeBridge: NSObject, WKScriptMessageHandler,
 
     private func denied() {
         status("麦克风权限被拒绝", "err")
-        eval("window.__shiyiAsr && window.__shiyiAsr('', false, '请到 设置→GGUF 里打开麦克风');")
+        eval("window.__ggufAsr && window.__ggufAsr('', false, '请到 设置→GGUF 里打开麦克风');")
     }
 
     private func rejectRecording(_ message: String) {
-        eval("window.__shiyiAsr && window.__shiyiAsr('', false, \(jsLiteral(message)));")
+        eval("window.__ggufAsr && window.__ggufAsr('', false, \(jsLiteral(message)));")
     }
 
     private func stopRecording(cancel: Bool) {
@@ -458,7 +458,7 @@ final class NativeBridge: NSObject, WKScriptMessageHandler,
                         self.stopEngine()
                         if !text.isEmpty {
                             self.status("已识别", "ok")
-                            self.eval("window.__shiyiAsr && window.__shiyiAsr(\(jsLiteral(text)), true, '');")
+                            self.eval("window.__ggufAsr && window.__ggufAsr(\(jsLiteral(text)), true, '');")
                         } else {
                             self.status("没听清", "warn")
                             self.rejectRecording("没听清，再说一次")

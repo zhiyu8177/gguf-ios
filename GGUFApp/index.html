@@ -4,154 +4,130 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="format-detection" content="telephone=no">
-<title>GGUF · 本地 Agent</title>
+<title>GGUF 手机端</title>
 <style>
-  :root {
-    --bg: #F5F4F1; --card: #FFFFFF; --line: #E2E0DA;
-    --text: #2C2C2A; --muted: #6B6A65; --hint: #9A9891;
-    --blue: #185FA5; --blue-soft: #E6F1FB; --blue-line: #B5D4F4;
-    --green: #3B6D11; --green-soft: #EAF3DE; --green-line: #C0DD97;
-    --amber: #854F0B; --amber-soft: #FAEEDA;
-    --red: #A32D2D; --red-soft: #FCEBEB; --red-line: #F0A9A9;
-    --safe-t: env(safe-area-inset-top, 0px);
-    --safe-b: env(safe-area-inset-bottom, 0px);
-  }
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
+    background: #0d1117; color: #e6edf3;
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
     font-size: 15px; line-height: 1.5;
     display: flex; flex-direction: column;
     height: 100vh; height: 100dvh;
-    overscroll-behavior: none;
-    -webkit-text-size-adjust: 100%;
+    overscroll-behavior: none; -webkit-text-size-adjust: 100%;
   }
-
   /* ---------- 顶栏 ---------- */
   header {
-    flex: none; background: var(--card); border-bottom: 1px solid var(--line);
-    padding: calc(var(--safe-t) + 10px) 14px 9px;
+    flex: none; background: #161b22; border-bottom: 1px solid #30363d;
+    padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 9px;
   }
   .hrow { display: flex; align-items: center; gap: 10px; }
   .avatar {
-    width: 34px; height: 34px; border-radius: 11px; flex: none;
-    background: linear-gradient(135deg, #2F6FB0, #185FA5); color: #fff;
+    width: 34px; height: 34px; border-radius: 9px; flex: none;
+    background: linear-gradient(135deg, #2ea043, #1f6feb); color: #fff;
     display: flex; align-items: center; justify-content: center;
-    font-size: 15px; font-weight: 600; letter-spacing: .5px;
+    font-size: 14px; font-weight: 700; letter-spacing: .5px;
   }
   .titles { min-width: 0; flex: 1; line-height: 1.3; }
   .titles h1 { margin: 0; font-size: 16px; font-weight: 600; }
-  .titles .sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .titles .sub { font-size: 11.5px; color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .iconbtn {
-    width: 34px; height: 34px; flex: none; padding: 0; border-radius: 10px;
-    background: var(--bg); border: 1px solid var(--line); color: var(--muted);
-    font-size: 13px; display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
+    width: 34px; height: 34px; flex: none; padding: 0; border-radius: 9px;
+    background: #0d1117; border: 1px solid #30363d; color: #8b949e;
+    font-size: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer;
   }
-  .iconbtn:active { background: #ECEAE4; }
-  .iconbtn.warn { color: var(--red); border-color: var(--red-line); background: var(--red-soft); }
+  .iconbtn:active { background: #21262d; color: #e6edf3; }
+  .iconbtn.warn { color: #f85149; border-color: #da3633; background: #2d1a1a; }
   .statusline { display: flex; align-items: center; gap: 6px; margin-top: 8px; height: 16px; }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--hint); flex: none; }
-  .dot.ok { background: #4C9A2A; }
-  .dot.warn { background: #C98A12; }
-  .dot.err { background: #C0392B; }
-  #status { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: #8b949e; flex: none; }
+  .dot.ok { background: #3fb950; }
+  .dot.warn { background: #d29922; }
+  .dot.err { background: #f85149; }
+  #status { font-size: 11.5px; color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   /* ---------- 消息区 ---------- */
   main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 14px 8px; }
-  .wrap { display: flex; flex-direction: column; gap: 16px; max-width: 720px; margin: 0 auto; }
-  .empty { text-align: center; color: var(--hint); font-size: 13px; padding: 34px 16px; line-height: 1.9; }
-  .empty b { display: block; font-size: 15px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
-
+  .wrap { display: flex; flex-direction: column; gap: 14px; max-width: 720px; margin: 0 auto; }
+  .empty { text-align: center; color: #8b949e; font-size: 13px; padding: 34px 16px; line-height: 1.9; }
+  .empty b { display: block; font-size: 15px; color: #b1bac4; font-weight: 600; margin-bottom: 6px; }
   .msg { display: flex; flex-direction: column; gap: 5px; max-width: 100%; }
   .msg.user { align-items: flex-end; }
   .msg.bot { align-items: flex-start; }
   .bubble {
-    max-width: 86%; padding: 10px 14px; border-radius: 16px;
+    max-width: 86%; padding: 10px 14px; border-radius: 15px;
     white-space: pre-wrap; word-break: break-word; line-height: 1.62;
   }
-  .user .bubble { background: var(--blue); color: #fff; border-bottom-right-radius: 5px; }
-  .bot .bubble { background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
-
-  /* 盯盘提醒：和聊天消息区分开，一眼能认出是系统推的 */
+  .user .bubble { background: #1f6feb; color: #fff; border-bottom-right-radius: 5px; }
+  .bot .bubble { background: #161b22; border: 1px solid #30363d; border-bottom-left-radius: 5px; }
+  .err .bubble { background: #2d1a1a; border: 1px solid #da3633; color: #f0a9a9; }
   .msg.alert { align-items: stretch; }
   .alert .bubble {
-    background: var(--amber-soft); border: 1px solid #E8C89A;
-    border-left: 3px solid var(--amber); border-radius: 10px;
-    padding: 10px 12px; min-width: 0;
+    background: #2d2215; border: 1px solid #d29922; border-left: 3px solid #d29922;
+    border-radius: 10px; padding: 10px 12px; min-width: 0;
   }
-  .alert.hot .bubble {
-    background: var(--red-soft); border-color: var(--red-line);
-    border-left-color: var(--red);
-  }
+  .alert.hot .bubble { background: #2d1a1a; border-color: #f85149; border-left-color: #f85149; }
   .alert .head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 5px; }
   .alert .ttl { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; }
-  .alert.hot .ttl { color: var(--red); }
-  .alert .tm { color: var(--hint); font-size: 11px; flex: none; }
+  .alert.hot .ttl { color: #f85149; }
+  .alert .tm { color: #8b949e; font-size: 11px; flex: none; }
   .alert .bd { white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
-  .err .bubble { background: var(--red-soft); border: 1px solid var(--red-line); color: var(--red); }
-  .meta { font-size: 11px; color: var(--hint); padding: 0 4px; display: flex; gap: 8px; align-items: center; }
+  .meta { font-size: 11px; color: #8b949e; padding: 0 4px; display: flex; gap: 8px; align-items: center; }
   .speak {
-    border: 1px solid var(--line); background: var(--card); color: var(--blue);
+    border: 1px solid #30363d; background: #161b22; color: #58a6ff;
     border-radius: 9px; padding: 2px 9px; font-size: 11.5px; cursor: pointer;
   }
-  .speak.on { background: var(--blue-soft); border-color: var(--blue-line); }
-
+  .speak.on { background: #12273c; border-color: #1f6feb; }
   .typing { display: flex; gap: 4px; padding: 4px 2px; }
-  .typing i {
-    width: 6px; height: 6px; border-radius: 50%; background: var(--hint);
-    animation: blink 1.2s infinite;
-  }
+  .typing i { width: 6px; height: 6px; border-radius: 50%; background: #8b949e; animation: blink 1.2s infinite; }
   .typing i:nth-child(2) { animation-delay: .18s; }
   .typing i:nth-child(3) { animation-delay: .36s; }
   @keyframes blink { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
-
   /* ---------- 底栏 ---------- */
-  footer { flex: none; background: var(--card); border-top: 1px solid var(--line); padding: 10px 12px calc(10px + var(--safe-b)); }
+  footer {
+    flex: none; background: #161b22; border-top: 1px solid #30363d;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
   .bar { display: flex; align-items: flex-end; gap: 8px; max-width: 720px; margin: 0 auto; }
   #input {
     flex: 1; min-height: 42px; max-height: 120px; resize: none;
-    padding: 10px 14px; border-radius: 21px; border: 1px solid var(--line);
-    background: var(--bg); color: var(--text); font: inherit; font-size: 16px; line-height: 1.4;
+    padding: 10px 14px; border-radius: 21px; border: 1px solid #30363d;
+    background: #0d1117; color: #e6edf3; font: inherit; font-size: 16px; line-height: 1.4;
     outline: none;
   }
-  #input:focus { border-color: var(--blue-line); background: #fff; }
+  #input:focus { border-color: #1f6feb; background: #0d1117; }
   .round {
     width: 42px; height: 42px; flex: none; padding: 0; border-radius: 50%;
-    border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    border: 1px solid #30363d; background: #0d1117; color: #e6edf3;
     display: flex; align-items: center; justify-content: center;
     transition: transform .12s, background .12s;
   }
   .round:active { transform: scale(.94); }
-  #btnSend { background: var(--blue); border-color: var(--blue); color: #fff; font-size: 13px; }
+  #btnSend { background: #238636; border-color: #238636; color: #fff; font-size: 13px; }
   #btnSend:disabled { opacity: .45; }
-  #btnMic.rec { background: var(--red); border-color: var(--red); color: #fff; transform: scale(1.06); }
-  #btnMic.hold { background: #F3E2E2; border-color: var(--red-line); color: var(--red); }
-
+  #btnMic.rec { background: #f85149; border-color: #f85149; color: #fff; transform: scale(1.06); }
+  #btnMic.hold { background: #2d1a1a; border-color: #da3633; color: #f85149; }
   /* ---------- 录音浮层 ---------- */
   .overlay {
     position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-    background: rgba(30, 28, 24, .32); z-index: 50; padding: 24px;
+    background: rgba(1, 4, 9, .55); z-index: 50; padding: 24px;
   }
   .overlay.show { display: flex; }
   .panel {
-    background: rgba(255,255,255,.97); border-radius: 18px; padding: 22px 26px;
-    text-align: center; min-width: 190px; box-shadow: 0 12px 34px rgba(0,0,0,.16);
+    background: #161b22; border: 1px solid #30363d; border-radius: 18px; padding: 22px 26px;
+    text-align: center; min-width: 190px; box-shadow: 0 12px 34px rgba(0,0,0,.5);
   }
   .wave { display: flex; gap: 3px; justify-content: center; align-items: flex-end; height: 34px; margin-bottom: 12px; }
-  .wave span { width: 4px; border-radius: 2px; background: var(--blue); height: 8px; transition: height .08s linear; }
-  .wave.cancel span { background: var(--red); }
-  .panel .tip { font-size: 13px; color: var(--muted); }
-  .panel .tip.cancel { color: var(--red); font-weight: 600; }
-
+  .wave span { width: 4px; border-radius: 2px; background: #58a6ff; height: 8px; transition: height .08s linear; }
+  .wave.cancel span { background: #f85149; }
+  .panel .tip { font-size: 13px; color: #8b949e; }
+  .panel .tip.cancel { color: #f85149; font-weight: 600; }
   .toast {
-    position: fixed; left: 50%; bottom: calc(84px + var(--safe-b)); transform: translate(-50%, 8px);
-    background: rgba(44,44,42,.92); color: #fff; font-size: 13px; padding: 8px 16px;
-    border-radius: 20px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 60;
-    max-width: 84vw; text-align: center;
+    position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    transform: translate(-50%, 8px);
+    background: rgba(22, 27, 34, .95); color: #fff; font-size: 13px; padding: 8px 16px;
+    border: 1px solid #30363d; border-radius: 20px; opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s; z-index: 60; max-width: 84vw; text-align: center;
   }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
 </style>
@@ -160,13 +136,12 @@
 
 <header>
   <div class="hrow">
-    <div class="avatar" id="avatar">壹</div>
+    <div class="avatar">G</div>
     <div class="titles">
-      <h1 id="whoTitle">GGUF</h1>
-      <div class="sub" id="whoSub">GGUF · 推理在本机 · 零Token消耗</div>
+      <h1>GGUF</h1>
+      <div class="sub">推理在本机 · 零Token消耗</div>
     </div>
-    <button class="iconbtn" id="btnWho" title="切换对话对象">贰</button>
-    <button class="iconbtn" id="btnCheck" title="检查模型">检</button>
+    <button class="iconbtn" id="btnCheck" title="检查连接">检</button>
     <button class="iconbtn warn" id="btnClear" title="清空对话">清</button>
   </div>
   <div class="statusline">
@@ -205,16 +180,15 @@
 "use strict";
 
 /* =========================================================
-   接口层
-   在 App 里走原生桥（无跨域、无 ATS 问题、TTS 由原生播放）
-   在浏览器里自动退化成 fetch（电脑上直接调试用）
+   GGUF 手机壳 · 包内兜底页面（2026-10-31 重写，去拾壹化）
+   App 里：先探测电脑地址，通 → 加载远程页面；全不通 → 本页兜底
+   本页功能全保留：对话 / 语音 / TTS / 历史同步 / 盯盘提醒 / 地址切换
    ========================================================= */
-/* 电脑地址候选（换了电脑/换了组网IP 只改这里，不用重编壳）：
-   浏览器直接打开时用同源地址；App 里是 file:// → 按顺序自动探测，谁通用谁 */
-/* 用户手动填的电脑地址（手机上点"连接异常/连不上电脑"红字可填写；本地保存，不用重装） */
+
+/* 电脑地址候选（换电脑/换组网 IP 只改这里，不用重编壳） */
 const CUSTOM = localStorage.getItem("gguf_server");
 const API_LIST = (CUSTOM ? [CUSTOM] : []).concat([
-  "http://172.16.2.103:8000",   // 本机（至强）蒲公英地址 · GGUF 8000（172.16.2.248 有线网卡已断，2026-10-30 换为 VPN 卡地址）
+  "http://172.16.2.103:8000",   // 本机（至强）蒲公英地址 · GGUF 8000
   "http://192.168.1.8:8000"     // 手机与电脑同一 WiFi 时直连
 ]);
 let API = (location.protocol === "http:" || location.protocol === "https:")
@@ -223,15 +197,12 @@ let API = (location.protocol === "http:" || location.protocol === "https:")
 const H = window.webkit && window.webkit.messageHandlers;
 const NATIVE = !!(H && H.api);
 
-/* 页面版本号：改页面就改这里。
-   启动时打一条 /__page 到电脑端日志，"手机上跑的是哪版页面 / 是 App 还是浏览器 /
-   实际连的哪个地址" 一眼可查，不用再靠猜。 */
-const BUILD = "20261023-1100";
+const BUILD = "20261031-gguf";
 
 let _seq = 0;
 const _pending = new Map();
 
-window.__shiyiCb = function (id, json) {
+window.__ggufCb = function (id, json) {
   const p = _pending.get(id);
   if (!p) return;
   _pending.delete(id);
@@ -261,7 +232,6 @@ function playBlob(blob) {
   _audio = new Audio(URL.createObjectURL(blob));
   _audio.play().catch(function () {});
 }
-
 function stopAudio() {
   if (_audio) { try { _audio.pause(); } catch (e) {} _audio = null; }
   if (NATIVE) { try { H.api.postMessage({ id: ++_seq, method: "ttsStop", params: {} }); } catch (e) {} }
@@ -288,8 +258,6 @@ async function httpCall(method, p) {
     return await r.json();
   }
   if (method === "history") {
-    // 服务端落盘的共享历史：桌面端和手机端启动时都从这里回放
-    // p.since > 0 只取新增（增量轮询），否则取最近 limit 条
     const since = Number(p.since || 0);
     const limit = Number(p.limit || 60);
     const qs = since > 0 ? ("?since=" + since + "&limit=" + limit) : ("?limit=" + limit);
@@ -304,7 +272,7 @@ async function httpCall(method, p) {
     const r = await apiFetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: p.text, session_id: p.session, to: p.to })
+      body: JSON.stringify({ text: p.text, session_id: p.session, to: "gguf" })
     });
     const d = await r.json().catch(function () { return {}; });
     if (!r.ok || d.error) throw new Error(d.error || ("服务返回 " + r.status));
@@ -325,8 +293,6 @@ async function httpCall(method, p) {
     const since = p.since || 0;
     const r = await apiFetch("/alerts?since=" + since, { cache: "no-store" });
     if (r.ok) return { payload: await r.json() };
-    // 电脑端还是旧代码（404）→ 改读静态清单。
-    // 8000 每次请求都重新读这个文件，所以不用重启服务也能拿到提醒。
     const r2 = await apiFetch("/manifest.json", { cache: "no-store" });
     const m = await r2.json();
     const al = m.alerts || [];
@@ -337,7 +303,7 @@ async function httpCall(method, p) {
       }
     };
   }
-  if (method === "buzz") return {};   // 浏览器里没有震动，静默跳过
+  if (method === "buzz") return {};
   throw new Error("未知方法 " + method);
 }
 
@@ -346,9 +312,10 @@ async function httpCall(method, p) {
    ========================================================= */
 const $ = function (id) { return document.getElementById(id); };
 const log = $("log"), main = $("main"), input = $("input");
-const btnSend = $("btnSend"), btnMic = $("btnMic"), btnWho = $("btnWho");
+const btnSend = $("btnSend"), btnMic = $("btnMic");
 const btnCheck = $("btnCheck"), btnClear = $("btnClear");
 const statusEl = $("status"), dot = $("dot");
+
 /* 点状态条 → 手动填电脑地址（存本地，立即重连） */
 statusEl.addEventListener("click", function () {
   const cur = localStorage.getItem("gguf_server") || API_LIST[0];
@@ -358,18 +325,18 @@ statusEl.addEventListener("click", function () {
   else localStorage.removeItem("gguf_server");
   location.reload();
 });
-const overlay = $("overlay"), ovTip = $("ovTip"), wave = $("wave");
-const toastEl = $("toast"), whoTitle = $("whoTitle"), whoSub = $("whoSub"), avatar = $("avatar");
 
-let mode = "shiyi";
+const overlay = $("overlay"), ovTip = $("ovTip"), wave = $("wave");
+const toastEl = $("toast");
+
 let busy = false;
 let pendingText = "";        // 本端刚发出的文字：轮询拿回来时据此去重
 let lastHistId = 0;          // 已同步到的最大消息 id
 const renderedIds = new Set();
-let sessionId = localStorage.getItem("shiyi_session");
+let sessionId = localStorage.getItem("gguf_session");
 if (!sessionId) {
-  sessionId = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  localStorage.setItem("shiyi_session", sessionId);
+  sessionId = "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  localStorage.setItem("gguf_session", sessionId);
 }
 
 function setStatus(text, level) {
@@ -388,7 +355,6 @@ function toast(text) {
 function scrollDown() {
   requestAnimationFrame(function () { main.scrollTop = main.scrollHeight; });
 }
-
 function clearEmpty() {
   const e = log.querySelector(".empty");
   if (e) e.remove();
@@ -433,23 +399,16 @@ function remember(id) {
     if (n > lastHistId) lastHistId = n;
   }
 }
-
 function renderHist(m) {
   const id = Number(m.id || 0);
   if (id && renderedIds.has(id)) return;
   if (id && m.role === "user" && pendingText && m.text === pendingText) {
-    // 就是本端刚发的那条，气泡已经在屏幕上了，只记 id 不重复渲染
     remember(id);
     return;
   }
   addMsg(m.role === "user" ? "user" : "bot", m.text, true);
   remember(id);
 }
-
-/* 把服务端给的最大 id 记下来；就算服务端没带 last，也从 items 里自己推一遍。
-   2026-10-23：手机上出现 lastHistId 死锁在 0（每 3 秒重拉全量、还一条都不显示），
-   根因是包内 file:// 页面直接 fetch 被 WKWebView 跨源挡掉。
-   现在改成走 call()：App 里走原生桥，浏览器里走 fetch，两边都不受跨源限制。 */
 function appliedLast(d) {
   const last = Number((d && d.last) || 0);
   if (last > lastHistId) lastHistId = last;
@@ -459,7 +418,6 @@ function appliedLast(d) {
     if (n > lastHistId) lastHistId = n;
   }
 }
-
 async function loadHistory(initial) {
   try {
     const d = initial
@@ -472,15 +430,11 @@ async function loadHistory(initial) {
   } catch (e) { return 0; }
 }
 
-// 每 3 秒拉一次增量：两端同时开着，一边说话另一边能看到
-// 2026-10-23：原来这里挡了 document.hidden（窗口最小化/被遮住就停轮询），
-// 电脑端窗口一被压到后面就"没反应"了。改成照拉，代价可以忽略。
+/* 每 3 秒拉一次增量：两端同时开着，一边说话另一边能看到 */
 setInterval(function () {
   if (busy) return;
   loadHistory(false);
 }, 3000);
-
-// 窗口重新回到前台立刻补一次，不用等下一个 3 秒
 document.addEventListener("visibilitychange", function () {
   if (!document.hidden && !busy) loadHistory(false);
 });
@@ -519,25 +473,19 @@ async function toggleSpeak(btn, text) {
 }
 
 /* =========================================================
-   盯盘提醒
-   盯盘脚本把提醒塞进电脑端的 /alerts，这里每 10 秒拉一次。
-   App 切到后台时 JS 会被 iOS 冻住，回来再补拉，期间的提醒不会丢
-   （服务端存了最近 60 条）。
+   盯盘提醒：每 10 秒拉一次，服务端存最近 60 条
    ========================================================= */
-let alertLast = Number(localStorage.getItem("shiyi_alert_last") || 0);
+let alertLast = Number(localStorage.getItem("gguf_alert_last") || 0);
 let alertBooted = false;
 let alertTimer = null;
 
 function showAlert(it) {
   const hot = (Number(it.level) || 1) >= 3;
   clearEmpty();
-
   const box = document.createElement("div");
   box.className = "msg alert" + (hot ? " hot" : "");
-
   const b = document.createElement("div");
   b.className = "bubble";
-
   const head = document.createElement("div");
   head.className = "head";
   const ttl = document.createElement("div");
@@ -548,15 +496,12 @@ function showAlert(it) {
   tm.textContent = String(it.ts || "").slice(5, 16);
   head.appendChild(ttl);
   head.appendChild(tm);
-
   const bd = document.createElement("div");
   bd.className = "bd";
   bd.textContent = it.body || "";
-
   b.appendChild(head);
   b.appendChild(bd);
   box.appendChild(b);
-
   const meta = document.createElement("div");
   meta.className = "meta";
   const ask = document.createElement("button");
@@ -568,13 +513,10 @@ function showAlert(it) {
   };
   meta.appendChild(ask);
   box.appendChild(meta);
-
   log.appendChild(box);
   scrollDown();
-
   call("buzz", { style: hot ? "heavy" : "medium" }).catch(function () {});
   toast(it.title || "有新提醒");
-  // 只有"极度紧张"才自动念出来，否则太吵
   if (hot) call("tts", { text: String(it.title || "") }).catch(function () {});
 }
 
@@ -584,42 +526,33 @@ async function pollAlerts() {
   try {
     d = await call("alerts", { since: alertLast });
   } catch (e) {
-    return;                     // 电脑没开/换网了，安静等下一轮
+    return;
   }
   const p = (d && d.payload) || d || {};
   const items = p.items || [];
   const last = Number(p.last) || 0;
-
-  // 服务端被清过 / id 换过编号（last 比本地指针小）→ 直接对齐服务端，
-  // 不要归零：归零会把整段历史一次性弹出来，糊满一屏
   if (last && last < alertLast) {
     alertLast = last;
-    localStorage.setItem("shiyi_alert_last", alertLast);
+    localStorage.setItem("gguf_alert_last", alertLast);
     return;
   }
-
-  // 第一次跑且从没接过：不补弹历史（最多 30 条会刷屏），
-  // 但把半小时内最新那条亮出来 —— 相当于"通道已就绪"的回执
   if (!alertBooted) {
     alertBooted = true;
     if (!alertLast) {
       if (items.length) {
         const newest = items[items.length - 1];
         const ageMin = (Date.now() - Number(newest.id)) / 60000;
-        // 半小时内的正常提醒；"就绪回执"（tag=sys）不管隔多久都亮一次，
-        // 否则装完 App 没反应，分不清是没报警还是没通
         if ((ageMin >= 0 && ageMin < 30) || newest.tag === "sys") showAlert(newest);
       }
       alertLast = last;
-      localStorage.setItem("shiyi_alert_last", alertLast);
+      localStorage.setItem("gguf_alert_last", alertLast);
       return;
     }
   }
-
   for (let i = 0; i < items.length; i++) showAlert(items[i]);
   if (last > alertLast) {
     alertLast = last;
-    localStorage.setItem("shiyi_alert_last", alertLast);
+    localStorage.setItem("gguf_alert_last", alertLast);
   }
 }
 
@@ -628,19 +561,9 @@ function startAlertPolling() {
   alertTimer = setInterval(pollAlerts, 10000);
   setTimeout(pollAlerts, 1500);
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden) pollAlerts();   // 回到前台立刻补一次
+    if (!document.hidden) pollAlerts();
   });
 }
-
-function setMode(m) {
-  mode = m;
-  whoTitle.textContent = "GGUF";
-  avatar.textContent = "壹";
-  whoSub.textContent = "GGUF · 推理在本机 · 零Token消耗";
-  btnWho.style.display = "none";
-  input.placeholder = "输入问题，回车发送";
-}
-btnWho.onclick = function () { setMode(mode === "shier" ? "shiyi" : "shier"); };
 
 /* ---------- 发送 ---------- */
 async function send() {
@@ -648,7 +571,6 @@ async function send() {
   if (!text || busy) return;
   stopAudio();
   if (speakingBtn) { speakingBtn.classList.remove("on"); speakingBtn.textContent = "🔊 朗读"; speakingBtn = null; }
-
   input.value = "";
   autoGrow();
   addMsg("user", text, false);
@@ -661,14 +583,12 @@ async function send() {
   const t0 = Date.now();
 
   try {
-    const data = await call("chat", { text: text, session: sessionId, to: mode,
+    const data = await call("chat", { text: text, session: sessionId, to: "gguf",
                                       src: NATIVE ? "mobile" : "desktop" });
     const reply = (data && data.reply) || "（空回答）";
     slot.bubble.textContent = reply;
     slot.box.className = "msg bot";
-    // 这两条服务端已入库，记下 id 免得轮询重复渲染
     if (data) { remember(data.id_user); remember(data.id_bot); }
-    // 补上朗读按钮
     const meta = document.createElement("div");
     meta.className = "meta";
     const b = document.createElement("button");
@@ -690,7 +610,6 @@ async function send() {
     scrollDown();
   }
 }
-
 btnSend.onclick = send;
 
 input.addEventListener("input", autoGrow);
@@ -702,7 +621,7 @@ input.addEventListener("keydown", function (e) {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
 });
 
-/* ---------- 检查模型 / 清空 ---------- */
+/* ---------- 检查连接 / 清空 ---------- */
 btnCheck.onclick = async function () {
   btnCheck.disabled = true;
   setStatus("检查中…", "warn");
@@ -723,8 +642,8 @@ btnClear.onclick = async function () {
   if (!confirm("清空当前对话？")) return;
   stopAudio();
   try { await call("reset", {}); } catch (e) {}
-  sessionId = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  localStorage.setItem("shiyi_session", sessionId);
+  sessionId = "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  localStorage.setItem("gguf_session", sessionId);
   log.innerHTML = "";
   const empty = document.createElement("div");
   empty.className = "empty";
@@ -749,7 +668,6 @@ function nativeVoice(cmd) {
 function startHold(e) {
   if (busy) { toast("上一个问题还在回答"); return; }
   if (!voiceSupported()) {
-    // 浏览器里没有原生录音：退化成提示
     toast("网页版不支持按住说话，请用 App");
     return;
   }
@@ -765,7 +683,6 @@ function startHold(e) {
   animateWave();
   nativeVoice("down");
 }
-
 function moveHold(e) {
   if (!holding) return;
   const y = (e.touches ? e.touches[0].clientY : e.clientY) || 0;
@@ -782,7 +699,6 @@ function moveHold(e) {
     ovTip.textContent = "松开发送 · 上滑取消";
   }
 }
-
 function endHold(e) {
   if (!holding) return;
   holding = false;
@@ -794,17 +710,15 @@ function endHold(e) {
   if (canceling) toast("已取消");
   canceling = false;
 }
-
 btnMic.addEventListener("touchstart", startHold, { passive: false });
 btnMic.addEventListener("touchmove", moveHold, { passive: false });
 btnMic.addEventListener("touchend", endHold, { passive: false });
 btnMic.addEventListener("touchcancel", endHold, { passive: false });
-// 桌面浏览器按住说话（调试用）
 btnMic.addEventListener("mousedown", startHold);
 window.addEventListener("mousemove", moveHold);
 window.addEventListener("mouseup", endHold);
 
-/* 录音时的波形动画（假波形，纯视觉效果，不依赖原生电平） */
+/* 录音时的波形动画（假波形，纯视觉） */
 const bars = Array.prototype.slice.call(wave.children);
 let waveTimer = null;
 function animateWave() {
@@ -821,7 +735,7 @@ function stopWave() {
 }
 
 /* 原生识别结果回填 */
-window.__shiyiAsr = function (text, ok, err) {
+window.__ggufAsr = function (text, ok, err) {
   if (!ok) {
     setStatus("识别失败", "err");
     toast("识别失败：" + (err || "请重试"));
@@ -832,15 +746,14 @@ window.__shiyiAsr = function (text, ok, err) {
   input.value = t;
   autoGrow();
   setStatus("已识别", "ok");
-  send();          // 识别完直接发出去
+  send();
 };
 
-window.__shiyiStatus = function (text, level) {
+window.__ggufStatus = function (text, level) {
   setStatus(text, level || "");
 };
 
-/* 原生 TTS 播放结束回调 */
-window.__shiyiTtsDone = function () {
+window.__ggufTtsDone = function () {
   if (speakingBtn) {
     speakingBtn.classList.remove("on");
     speakingBtn.textContent = "🔊 朗读";
@@ -852,11 +765,9 @@ window.__shiyiTtsDone = function () {
    启动自检
    ========================================================= */
 (async function boot() {
-  setMode("shiyi");
-  // 信标：先报到，再干活。这样即使后面某步炸了，电脑端日志也能看到手机跑的是哪版页面。
   apiFetch("/__page?v=" + BUILD + "&native=" + (NATIVE ? 1 : 0) +
            "&api=" + encodeURIComponent(API), { cache: "no-store" }).catch(function () {});
-  startAlertPolling();          // 盯盘提醒：跟连接状态无关，独立轮询
+  startAlertPolling();
   if (!NATIVE && !voiceSupported()) {
     setStatus("网页调试模式 · " + API, "warn");
     return;
@@ -865,7 +776,6 @@ window.__shiyiTtsDone = function () {
   try {
     const t0 = Date.now();
     await call("health", {});
-    // 回放共享历史（桌面/手机同一份）：让打开的界面接着上次聊
     try {
       const n = await loadHistory(true);
       if (n) setStatus("已同步上次对话 · " + n + " 条 · 电脑在线", "ok");
