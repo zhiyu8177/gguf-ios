@@ -214,7 +214,7 @@
 /* 用户手动填的电脑地址（手机上点"连接异常/连不上电脑"红字可填写；本地保存，不用重装） */
 const CUSTOM = localStorage.getItem("gguf_server");
 const API_LIST = (CUSTOM ? [CUSTOM] : []).concat([
-  "http://172.16.2.248:8000",   // 本机（至强）蒲公英地址 · GGUF 8000
+  "http://172.16.2.103:8000",   // 本机（至强）蒲公英地址 · GGUF 8000（172.16.2.248 有线网卡已断，2026-10-30 换为 VPN 卡地址）
   "http://192.168.1.8:8000"     // 手机与电脑同一 WiFi 时直连
 ]);
 let API = (location.protocol === "http:" || location.protocol === "https:")
@@ -352,7 +352,7 @@ const statusEl = $("status"), dot = $("dot");
 /* 点状态条 → 手动填电脑地址（存本地，立即重连） */
 statusEl.addEventListener("click", function () {
   const cur = localStorage.getItem("gguf_server") || API_LIST[0];
-  const v = prompt("电脑地址（如 http://172.16.2.248:8000），留空用自动探测", cur);
+  const v = prompt("电脑地址（如 http://172.16.2.103:8000），留空用自动探测", cur);
   if (v === null) return;
   if (v.trim()) localStorage.setItem("gguf_server", v.trim());
   else localStorage.removeItem("gguf_server");
