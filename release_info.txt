@@ -1,2 +1,2 @@
-﻿https://github.com/zhiyu8177/gguf-ios/releases/download/v1793317151/GGUFApp.ipa  39936B  v1793317151
-https://github.com/zhiyu8177/gguf-ios/releases/download/v1793317454/GGUFApp.ipa  39424B
+﻿GGUFApp.ipa  39424B  https://github.com/zhiyu8177/gguf-ios/releases/download/v1793317931/GGUFApp.ipa
+GGUFTest.ipa  72166B  https://github.com/zhiyu8177/gguf-ios/releases/download/v1793317931/GGUFTest.ipa

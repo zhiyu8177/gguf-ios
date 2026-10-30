@@ -36,8 +36,11 @@ struct WebViewContainer: UIViewRepresentable {
         let wv = WKWebView(frame: .zero, configuration: cfg)
         wv.scrollView.bounces = false
         bridge.webView = wv
-        if let url = Bundle.main.url(forResource: "index", withExtension: "html") {
-            wv.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        // iOS 16.0.x 的 WKWebView 对 loadFileURL 有已知崩溃问题，
+        // 改为 loadHTMLString（内容不变），绕开该路径
+        if let url = Bundle.main.url(forResource: "index", withExtension: "html"),
+           let html = try? String(contentsOf: url, encoding: .utf8) {
+            wv.loadHTMLString(html, baseURL: nil)
         }
         return wv
     }

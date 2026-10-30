@@ -59,7 +59,7 @@ body{background:radial-gradient(1200px 700px at 70% -10%,#0a1a30 0%,#050b16 55%,
    默认蒲公英 IP + GGUF 8000；连不上会引导修改（存 localStorage）。 */
 var DEFAULT_SERVER='http://172.16.2.248:8000';
 var SERVER_IP=(localStorage.getItem('gguf_ip')||'').trim()||DEFAULT_SERVER;
-var API=(location.protocol==='file:')?SERVER_IP:'';
+var API=SERVER_IP;
 var TOKEN=(localStorage.getItem('gguf_token')||'').trim();
 
 function askServer(){
