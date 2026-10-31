@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<title>GGUF AI</title>
+<title>AgentShell 遥控</title>
 <style>
 :root{--bg:#04070f;--panel:#0b1322;--line:#12283d;--cyan:#00c8ff;--blue:#1a6dff;--text:#d7ecff;--dim:#6f93b8;--faint:#3c5a78}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -41,7 +41,7 @@ body{background:radial-gradient(1200px 700px at 70% -10%,#0a1a30 0%,#050b16 55%,
 </head>
 <body>
 <div class="topbar">
-  <span class="ttl">GGUF AI <em style="font-size:11px;color:#8e8e93;font-style:normal">v1.1</em></span>
+  <span class="ttl">AgentShell 遥控 <em style="font-size:11px;color:#8e8e93;font-style:normal">v1.2</em></span>
   <span class="stat"><span class="dot bad" id="dotE"></span>引擎 <span class="dot bad" id="dotT"></span>语音</span>
 </div>
 <div class="chat" id="chat">
@@ -56,18 +56,21 @@ body{background:radial-gradient(1200px 700px at 70% -10%,#0a1a30 0%,#050b16 55%,
 <div id="toast"></div>
 <script>
 /* ===== 服务地址 =====
-   默认蒲公英 IP + GGUF 8000；连不上会引导修改（存 localStorage）。 */
-var DEFAULT_SERVER='http://172.16.2.103:8000';
+   默认蒲公英 IP + AgentShell 8099；地址存原生 UserDefaults（重启保留）。
+   浏览器环境退回 localStorage（try/catch 兜底）。 */
+var DEFAULT_SERVER='http://172.16.2.103:8099';
 var SERVER_IP=DEFAULT_SERVER,TOKEN='';
-/* about: 协议（loadHTMLString）下访问 localStorage 会抛异常，必须包 try/catch */
 try{SERVER_IP=(localStorage.getItem('gguf_ip')||'').trim()||DEFAULT_SERVER;TOKEN=(localStorage.getItem('gguf_token')||'').trim();}catch(e){}
 var API=SERVER_IP;
 
 function askServer(){
   var s=window.prompt('电脑地址（含端口）',SERVER_IP);
   if(!s)return false;
-  SERVER_IP=s.trim();try{localStorage.setItem('gguf_ip',SERVER_IP)}catch(e){}
-  API=SERVER_IP;return true;
+  s=s.trim();if(!s)return false;
+  SERVER_IP=s;API=s;
+  try{localStorage.setItem('gguf_ip',s)}catch(e){}
+  if(hasBridge())callNative('setServer',{server:s});
+  return true;
 }
 function askToken(){
   var t=window.prompt('粘贴电脑端的连接码（如有）','');
@@ -108,9 +111,9 @@ function speak(text){
   stopSpeak();
   if(hasBridge()){
     nativePlaying=true;
-    callNative('tts',{text:text}).then(function(r){
+    callNative('tts',{text:text,server:API}).then(function(r){
       nativePlaying=false;
-      if(!r.ok)toast('语音合成失败');
+      if(!r.ok)toast('语音服务未启动');
     });
     return;
   }
@@ -232,14 +235,24 @@ if(hasBridge()){
   }
 }
 
-/* ===== 状态轮询（GGUF /health 返回 engine=online/standby/offline 三态） ===== */
+/* ===== 状态轮询（/health 返回 engine=online/standby；连不上引导改地址） ===== */
 function health(){
   if(hasBridge()){
-    callNative('health').then(function(r){
-      var h=r.ok?r.data:{};
-      var e=h.engine==='online'||h.engine==='standby';
-      document.getElementById('dotE').className='dot '+(e?'ok':'bad');
-      document.getElementById('dotT').className='dot '+(h.tts?'ok':'bad');
+    callNative('health',{server:API}).then(function(r){
+      if(r.ok){
+        window._askedServer=false;
+        var h=(typeof r.data==='string')?(function(){try{return JSON.parse(r.data)}catch(e){return {}}})():r.data;
+        var e=h.engine==='online'||h.engine==='standby';
+        document.getElementById('dotE').className='dot '+(e?'ok':'bad');
+        document.getElementById('dotT').className='dot '+(h.tts?'ok':'bad');
+      }else if(!window._askedServer){
+        window._askedServer=true;
+        addMsg('sys','[ 连不上 '+API+' · 点发送旁重试或修改地址 ]');
+        if(askServer()){toast('地址已更新，正在重连');health()}
+      }else{
+        document.getElementById('dotE').className='dot bad';
+        document.getElementById('dotT').className='dot bad';
+      }
     });
     return;
   }
@@ -256,7 +269,16 @@ function health(){
     }
   });
 }
-health();setInterval(health,10000);
+/* 启动时先用原生存的地址覆盖（UserDefaults 比 localStorage 可靠） */
+if(hasBridge()){
+  callNative('getServer').then(function(r){
+    if(r.ok&&r.data){try{var o=JSON.parse(r.data);if(o.server){SERVER_IP=o.server;API=o.server}}catch(e){}}
+    health();
+  });
+}else{
+  health();
+}
+setInterval(health,10000);
 </script>
 </body>
 </html>

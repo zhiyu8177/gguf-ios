@@ -1,790 +1,284 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="format-detection" content="telephone=no">
-<title>GGUF 手机端</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>AgentShell 遥控</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; }
-  body {
-    background: #0d1117; color: #e6edf3;
-    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-    font-size: 15px; line-height: 1.5;
-    display: flex; flex-direction: column;
-    height: 100vh; height: 100dvh;
-    overscroll-behavior: none; -webkit-text-size-adjust: 100%;
-  }
-  /* ---------- 顶栏 ---------- */
-  header {
-    flex: none; background: #161b22; border-bottom: 1px solid #30363d;
-    padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 9px;
-  }
-  .hrow { display: flex; align-items: center; gap: 10px; }
-  .avatar {
-    width: 34px; height: 34px; border-radius: 9px; flex: none;
-    background: linear-gradient(135deg, #2ea043, #1f6feb); color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 700; letter-spacing: .5px;
-  }
-  .titles { min-width: 0; flex: 1; line-height: 1.3; }
-  .titles h1 { margin: 0; font-size: 16px; font-weight: 600; }
-  .titles .sub { font-size: 11.5px; color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .iconbtn {
-    width: 34px; height: 34px; flex: none; padding: 0; border-radius: 9px;
-    background: #0d1117; border: 1px solid #30363d; color: #8b949e;
-    font-size: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer;
-  }
-  .iconbtn:active { background: #21262d; color: #e6edf3; }
-  .iconbtn.warn { color: #f85149; border-color: #da3633; background: #2d1a1a; }
-  .statusline { display: flex; align-items: center; gap: 6px; margin-top: 8px; height: 16px; }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: #8b949e; flex: none; }
-  .dot.ok { background: #3fb950; }
-  .dot.warn { background: #d29922; }
-  .dot.err { background: #f85149; }
-  #status { font-size: 11.5px; color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* ---------- 消息区 ---------- */
-  main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 14px 8px; }
-  .wrap { display: flex; flex-direction: column; gap: 14px; max-width: 720px; margin: 0 auto; }
-  .empty { text-align: center; color: #8b949e; font-size: 13px; padding: 34px 16px; line-height: 1.9; }
-  .empty b { display: block; font-size: 15px; color: #b1bac4; font-weight: 600; margin-bottom: 6px; }
-  .msg { display: flex; flex-direction: column; gap: 5px; max-width: 100%; }
-  .msg.user { align-items: flex-end; }
-  .msg.bot { align-items: flex-start; }
-  .bubble {
-    max-width: 86%; padding: 10px 14px; border-radius: 15px;
-    white-space: pre-wrap; word-break: break-word; line-height: 1.62;
-  }
-  .user .bubble { background: #1f6feb; color: #fff; border-bottom-right-radius: 5px; }
-  .bot .bubble { background: #161b22; border: 1px solid #30363d; border-bottom-left-radius: 5px; }
-  .err .bubble { background: #2d1a1a; border: 1px solid #da3633; color: #f0a9a9; }
-  .msg.alert { align-items: stretch; }
-  .alert .bubble {
-    background: #2d2215; border: 1px solid #d29922; border-left: 3px solid #d29922;
-    border-radius: 10px; padding: 10px 12px; min-width: 0;
-  }
-  .alert.hot .bubble { background: #2d1a1a; border-color: #f85149; border-left-color: #f85149; }
-  .alert .head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 5px; }
-  .alert .ttl { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; }
-  .alert.hot .ttl { color: #f85149; }
-  .alert .tm { color: #8b949e; font-size: 11px; flex: none; }
-  .alert .bd { white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
-  .meta { font-size: 11px; color: #8b949e; padding: 0 4px; display: flex; gap: 8px; align-items: center; }
-  .speak {
-    border: 1px solid #30363d; background: #161b22; color: #58a6ff;
-    border-radius: 9px; padding: 2px 9px; font-size: 11.5px; cursor: pointer;
-  }
-  .speak.on { background: #12273c; border-color: #1f6feb; }
-  .typing { display: flex; gap: 4px; padding: 4px 2px; }
-  .typing i { width: 6px; height: 6px; border-radius: 50%; background: #8b949e; animation: blink 1.2s infinite; }
-  .typing i:nth-child(2) { animation-delay: .18s; }
-  .typing i:nth-child(3) { animation-delay: .36s; }
-  @keyframes blink { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
-  /* ---------- 底栏 ---------- */
-  footer {
-    flex: none; background: #161b22; border-top: 1px solid #30363d;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
-  }
-  .bar { display: flex; align-items: flex-end; gap: 8px; max-width: 720px; margin: 0 auto; }
-  #input {
-    flex: 1; min-height: 42px; max-height: 120px; resize: none;
-    padding: 10px 14px; border-radius: 21px; border: 1px solid #30363d;
-    background: #0d1117; color: #e6edf3; font: inherit; font-size: 16px; line-height: 1.4;
-    outline: none;
-  }
-  #input:focus { border-color: #1f6feb; background: #0d1117; }
-  .round {
-    width: 42px; height: 42px; flex: none; padding: 0; border-radius: 50%;
-    border: 1px solid #30363d; background: #0d1117; color: #e6edf3;
-    display: flex; align-items: center; justify-content: center;
-    transition: transform .12s, background .12s;
-  }
-  .round:active { transform: scale(.94); }
-  #btnSend { background: #238636; border-color: #238636; color: #fff; font-size: 13px; }
-  #btnSend:disabled { opacity: .45; }
-  #btnMic.rec { background: #f85149; border-color: #f85149; color: #fff; transform: scale(1.06); }
-  #btnMic.hold { background: #2d1a1a; border-color: #da3633; color: #f85149; }
-  /* ---------- 录音浮层 ---------- */
-  .overlay {
-    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-    background: rgba(1, 4, 9, .55); z-index: 50; padding: 24px;
-  }
-  .overlay.show { display: flex; }
-  .panel {
-    background: #161b22; border: 1px solid #30363d; border-radius: 18px; padding: 22px 26px;
-    text-align: center; min-width: 190px; box-shadow: 0 12px 34px rgba(0,0,0,.5);
-  }
-  .wave { display: flex; gap: 3px; justify-content: center; align-items: flex-end; height: 34px; margin-bottom: 12px; }
-  .wave span { width: 4px; border-radius: 2px; background: #58a6ff; height: 8px; transition: height .08s linear; }
-  .wave.cancel span { background: #f85149; }
-  .panel .tip { font-size: 13px; color: #8b949e; }
-  .panel .tip.cancel { color: #f85149; font-weight: 600; }
-  .toast {
-    position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px));
-    transform: translate(-50%, 8px);
-    background: rgba(22, 27, 34, .95); color: #fff; font-size: 13px; padding: 8px 16px;
-    border: 1px solid #30363d; border-radius: 20px; opacity: 0; pointer-events: none;
-    transition: opacity .2s, transform .2s; z-index: 60; max-width: 84vw; text-align: center;
-  }
-  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+:root{--bg:#04070f;--panel:#0b1322;--line:#12283d;--cyan:#00c8ff;--blue:#1a6dff;--text:#d7ecff;--dim:#6f93b8;--faint:#3c5a78}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden}
+body{background:radial-gradient(1200px 700px at 70% -10%,#0a1a30 0%,#050b16 55%,#03060d 100%);color:var(--text);font-family:'PingFang SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;border-bottom:1px solid var(--line);background:rgba(5,11,22,.9)}
+.topbar .ttl{font-size:15px;font-weight:700;letter-spacing:2px;background:linear-gradient(90deg,#7fdcff,#1a6dff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:4px;vertical-align:1px}
+.dot.ok{background:#35e0a1;box-shadow:0 0 6px #35e0a1}
+.dot.bad{background:#ff6b81}
+.stat{font-size:10px;color:var(--dim);margin-left:auto;font-family:Consolas,monospace}
+.chat{flex:1;overflow-y:auto;padding:14px 12px 8px;-webkit-overflow-scrolling:touch}
+.msg{display:flex;margin-bottom:14px;animation:msgin .35s cubic-bezier(.2,.8,.3,1.1)}
+.msg.user{justify-content:flex-end}
+@keyframes msgin{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+.bubble{max-width:84%;padding:11px 14px;border-radius:14px;font-size:15px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.msg.ai .bubble{background:linear-gradient(180deg,rgba(13,26,46,.92),rgba(9,18,34,.92));border:1px solid var(--line);border-left:2px solid var(--cyan);border-bottom-left-radius:4px}
+.msg.user .bubble{background:linear-gradient(135deg,#0e2a4a,#0a1a30);border:1px solid #1e4468;border-bottom-right-radius:4px}
+.bubble.streaming:after{content:'▍';color:var(--cyan);animation:blink .8s infinite;margin-left:2px}
+@keyframes blink{50%{opacity:0}}
+.sysb{text-align:center;color:var(--faint);font-size:11.5px;margin:8px 0;font-family:Consolas,monospace}
+.inputbar{display:flex;gap:8px;padding:10px 12px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:rgba(5,11,22,.95)}
+#inp{flex:1;background:#081222;border:1px solid var(--line);border-radius:22px;padding:11px 16px;color:var(--text);font-size:15px;outline:none}
+#inp:focus{border-color:var(--cyan)}
+.cbtn{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:#0a1424;color:var(--dim);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cbtn:active{transform:scale(.94)}
+#sendBtn{border-color:var(--blue);color:var(--cyan)}
+#micBtn.rec{color:#ff6b81;border-color:#ff6b81;animation:recp 1s infinite}
+@keyframes recp{50%{box-shadow:0 0 12px rgba(255,107,129,.5)}}
+#ttsFloat{position:fixed;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));width:46px;height:46px;border-radius:50%;border:1.5px solid var(--line);background:rgba(8,17,32,.94);color:var(--dim);z-index:60;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+#ttsFloat.on{color:var(--cyan);border-color:var(--blue);box-shadow:0 0 14px rgba(0,200,255,.4)}
+#toast{position:fixed;left:50%;bottom:150px;transform:translateX(-50%);background:rgba(9,20,36,.95);border:1px solid var(--line);color:var(--cyan);font-size:12px;padding:8px 16px;border-radius:18px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:70;white-space:nowrap}
+#toast.show{opacity:1}
 </style>
 </head>
 <body>
-
-<header>
-  <div class="hrow">
-    <div class="avatar">G</div>
-    <div class="titles">
-      <h1>GGUF</h1>
-      <div class="sub">推理在本机 · 零Token消耗</div>
-    </div>
-    <button class="iconbtn" id="btnCheck" title="检查连接">检</button>
-    <button class="iconbtn warn" id="btnClear" title="清空对话">清</button>
-  </div>
-  <div class="statusline">
-    <span class="dot" id="dot"></span>
-    <span id="status" title="点我改电脑地址">正在连接电脑…</span>
-  </div>
-</header>
-
-<main id="main">
-  <div class="wrap" id="log">
-    <div class="empty">
-      <b>GGUF 在这儿</b>
-      按住右下角话筒说话，松手即识别<br>
-      也可以直接打字，回车发送
-    </div>
-  </div>
-</main>
-
-<footer>
-  <div class="bar">
-    <textarea id="input" rows="1" placeholder="输入问题，回车发送"></textarea>
-    <button class="round" id="btnMic" aria-label="按住说话">🎤</button>
-    <button class="round" id="btnSend">发送</button>
-  </div>
-</footer>
-
-<div class="overlay" id="overlay">
-  <div class="panel">
-    <div class="wave" id="wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-    <div class="tip" id="ovTip">松开发送 · 上滑取消</div>
-  </div>
+<div class="topbar">
+  <span class="ttl">AgentShell 遥控 <em style="font-size:11px;color:#8e8e93;font-style:normal">v1.2</em></span>
+  <span class="stat"><span class="dot bad" id="dotE"></span>引擎 <span class="dot bad" id="dotT"></span>语音</span>
 </div>
-<div class="toast" id="toast"></div>
-
+<div class="chat" id="chat">
+  <div class="sysb">[ 手机通道已连接 · 本地推理 · 零Token消耗 ]</div>
+</div>
+<div class="inputbar">
+  <button class="cbtn" id="micBtn" title="语音输入"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg></button>
+  <input id="inp" placeholder="说点什么..." autocomplete="off">
+  <button class="cbtn" id="sendBtn" title="发送"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z"/></svg></button>
+</div>
+<button id="ttsFloat" title="自动朗读开关"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.4 5.6a9 9 0 0 1 0 12.8"/></svg></button>
+<div id="toast"></div>
 <script>
-"use strict";
+/* ===== 服务地址 =====
+   默认蒲公英 IP + AgentShell 8099；地址存原生 UserDefaults（重启保留）。
+   浏览器环境退回 localStorage（try/catch 兜底）。 */
+var DEFAULT_SERVER='http://172.16.2.103:8099';
+var SERVER_IP=DEFAULT_SERVER,TOKEN='';
+try{SERVER_IP=(localStorage.getItem('gguf_ip')||'').trim()||DEFAULT_SERVER;TOKEN=(localStorage.getItem('gguf_token')||'').trim();}catch(e){}
+var API=SERVER_IP;
 
-/* =========================================================
-   GGUF 手机壳 · 包内兜底页面（2026-10-31 全面重写）
-   App 里：先探测电脑地址，通 → 加载远程页面；全不通 → 本页兜底
-   本页功能全保留：对话 / 语音 / TTS / 历史同步 / 盯盘提醒 / 地址切换
-   ========================================================= */
-
-/* 电脑地址候选（换电脑/换组网 IP 只改这里，不用重编壳） */
-const CUSTOM = localStorage.getItem("gguf_server");
-const API_LIST = (CUSTOM ? [CUSTOM] : []).concat([
-  "http://172.16.2.103:8000",   // 本机（至强）蒲公英地址 · GGUF 8000
-  "http://192.168.1.8:8000"     // 手机与电脑同一 WiFi 时直连
-]);
-let API = (location.protocol === "http:" || location.protocol === "https:")
-  ? location.origin
-  : API_LIST[0];
-const H = window.webkit && window.webkit.messageHandlers;
-const NATIVE = !!(H && H.api);
-
-const BUILD = "20261031-gguf";
-
-let _seq = 0;
-const _pending = new Map();
-
-window.__ggufCb = function (id, json) {
-  const p = _pending.get(id);
-  if (!p) return;
-  _pending.delete(id);
-  let msg;
-  try { msg = JSON.parse(json); } catch (e) { msg = { ok: false, error: "返回数据异常" }; }
-  if (msg && msg.ok) p.resolve(msg.data || {});
-  else p.reject(new Error((msg && msg.error) || "调用失败"));
-};
-
-function call(method, params) {
-  if (NATIVE) {
-    return new Promise((resolve, reject) => {
-      const id = ++_seq;
-      _pending.set(id, { resolve, reject });
-      H.api.postMessage({ id: id, method: method, params: params || {} });
-      setTimeout(() => {
-        if (_pending.has(id)) { _pending.delete(id); reject(new Error("等待超时")); }
-      }, 240000);
-    });
-  }
-  return httpCall(method, params || {});
+function askServer(){
+  var s=window.prompt('电脑地址（含端口）',SERVER_IP);
+  if(!s)return false;
+  s=s.trim();if(!s)return false;
+  SERVER_IP=s;API=s;
+  try{localStorage.setItem('gguf_ip',s)}catch(e){}
+  if(hasBridge())callNative('setServer',{server:s});
+  return true;
+}
+function askToken(){
+  var t=window.prompt('粘贴电脑端的连接码（如有）','');
+  if(!t)return false;
+  TOKEN=t.trim();try{localStorage.setItem('gguf_token',TOKEN)}catch(e){}
+  return true;
 }
 
-let _audio = null;
-function playBlob(blob) {
-  stopAudio();
-  _audio = new Audio(URL.createObjectURL(blob));
-  _audio.play().catch(function () {});
-}
-function stopAudio() {
-  if (_audio) { try { _audio.pause(); } catch (e) {} _audio = null; }
-  if (NATIVE) { try { H.api.postMessage({ id: ++_seq, method: "ttsStop", params: {} }); } catch (e) {} }
-}
-
-/* 带地址切换的 fetch：当前地址连不上就顺次换下一个候选，成功后记住它 */
-async function apiFetch(path, opts) {
-  const sameOrigin = (location.protocol === "http:" || location.protocol === "https:");
-  const list = sameOrigin ? [API] : API_LIST;
-  let lastErr = null;
-  for (let i = 0; i < list.length; i++) {
-    try {
-      const r = await fetch(list[i] + path, opts);
-      if (!sameOrigin && API !== list[i]) API = list[i];
-      return r;
-    } catch (e) { lastErr = e; }
-  }
-  throw lastErr || new Error("连不上电脑");
-}
-
-async function httpCall(method, p) {
-  if (method === "health") {
-    const r = await apiFetch("/health", { cache: "no-store" });
-    return await r.json();
-  }
-  if (method === "history") {
-    const since = Number(p.since || 0);
-    const limit = Number(p.limit || 60);
-    const qs = since > 0 ? ("?since=" + since + "&limit=" + limit) : ("?limit=" + limit);
-    const r = await apiFetch("/history" + qs, { cache: "no-store" });
-    return await r.json();
-  }
-  if (method === "reset") {
-    const r = await apiFetch("/api/reset", { method: "POST" });
-    return await r.json();
-  }
-  if (method === "chat") {
-    const r = await apiFetch("/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: p.text, session_id: p.session, to: "gguf" })
-    });
-    const d = await r.json().catch(function () { return {}; });
-    if (!r.ok || d.error) throw new Error(d.error || ("服务返回 " + r.status));
-    return d;
-  }
-  if (method === "tts") {
-    const r = await apiFetch("/tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: p.text })
-    });
-    if (!r.ok) throw new Error("语音合成失败");
-    playBlob(await r.blob());
-    return { playing: true };
-  }
-  if (method === "ttsStop") { stopAudio(); return {}; }
-  if (method === "alerts") {
-    const since = p.since || 0;
-    const r = await apiFetch("/alerts?since=" + since, { cache: "no-store" });
-    if (r.ok) return { payload: await r.json() };
-    const r2 = await apiFetch("/manifest.json", { cache: "no-store" });
-    const m = await r2.json();
-    const al = m.alerts || [];
-    return {
-      payload: {
-        items: al.filter(function (x) { return Number(x.id) > since; }),
-        last: al.length ? Number(al[al.length - 1].id) : 0
-      }
-    };
-  }
-  if (method === "buzz") return {};
-  throw new Error("未知方法 " + method);
-}
-
-/* =========================================================
-   界面
-   ========================================================= */
-const $ = function (id) { return document.getElementById(id); };
-const log = $("log"), main = $("main"), input = $("input");
-const btnSend = $("btnSend"), btnMic = $("btnMic");
-const btnCheck = $("btnCheck"), btnClear = $("btnClear");
-const statusEl = $("status"), dot = $("dot");
-
-/* 点状态条 → 手动填电脑地址（存本地，立即重连） */
-statusEl.addEventListener("click", function () {
-  const cur = localStorage.getItem("gguf_server") || API_LIST[0];
-  const v = prompt("电脑地址（如 http://172.16.2.103:8000），留空用自动探测", cur);
-  if (v === null) return;
-  if (v.trim()) localStorage.setItem("gguf_server", v.trim());
-  else localStorage.removeItem("gguf_server");
-  location.reload();
-});
-
-const overlay = $("overlay"), ovTip = $("ovTip"), wave = $("wave");
-const toastEl = $("toast");
-
-let busy = false;
-let pendingText = "";        // 本端刚发出的文字：轮询拿回来时据此去重
-let lastHistId = 0;          // 已同步到的最大消息 id
-const renderedIds = new Set();
-let sessionId = localStorage.getItem("gguf_session");
-if (!sessionId) {
-  sessionId = "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  localStorage.setItem("gguf_session", sessionId);
-}
-
-function setStatus(text, level) {
-  statusEl.textContent = text;
-  dot.className = "dot" + (level ? " " + level : "");
-}
-
-let toastTimer = null;
-function toast(text) {
-  toastEl.textContent = text;
-  toastEl.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 1900);
-}
-
-function scrollDown() {
-  requestAnimationFrame(function () { main.scrollTop = main.scrollHeight; });
-}
-function clearEmpty() {
-  const e = log.querySelector(".empty");
-  if (e) e.remove();
-}
-
-function addMsg(role, text, withSpeak) {
-  clearEmpty();
-  const box = document.createElement("div");
-  box.className = "msg " + role;
-  const bubble = document.createElement("div");
-  bubble.className = "bubble";
-  if (text && text !== "…") bubble.textContent = text;
-  else if (text === "…") {
-    const t = document.createElement("div");
-    t.className = "typing";
-    t.innerHTML = "<i></i><i></i><i></i>";
-    bubble.appendChild(t);
-  }
-  box.appendChild(bubble);
-
-  if (role === "bot" && withSpeak) {
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    const btn = document.createElement("button");
-    btn.className = "speak";
-    btn.textContent = "🔊 朗读";
-    btn.onclick = function () { toggleSpeak(btn, bubble.textContent); };
-    meta.appendChild(btn);
-    box.appendChild(meta);
-    box.__speakBtn = btn;
-  }
-  log.appendChild(box);
-  scrollDown();
-  return { box: box, bubble: bubble };
-}
-
-/* ---------- 历史同步：桌面端与手机端共用一份 ---------- */
-function remember(id) {
-  const n = Number(id || 0);
-  if (n > 0) {
-    renderedIds.add(n);
-    if (n > lastHistId) lastHistId = n;
-  }
-}
-function renderHist(m) {
-  const id = Number(m.id || 0);
-  if (id && renderedIds.has(id)) return;
-  if (id && m.role === "user" && pendingText && m.text === pendingText) {
-    remember(id);
-    return;
-  }
-  addMsg(m.role === "user" ? "user" : "bot", m.text, true);
-  remember(id);
-}
-function appliedLast(d) {
-  const last = Number((d && d.last) || 0);
-  if (last > lastHistId) lastHistId = last;
-  const items = (d && d.items) || [];
-  for (const m of items) {
-    const n = Number(m.id || 0);
-    if (n > lastHistId) lastHistId = n;
-  }
-}
-async function loadHistory(initial) {
-  try {
-    const d = initial
-      ? await call("history", { limit: 60 })
-      : await call("history", { since: lastHistId, limit: 200 });
-    const items = (d && d.items) || [];
-    for (const m of items) renderHist(m);
-    appliedLast(d);
-    return items.length;
-  } catch (e) { return 0; }
-}
-
-/* 每 3 秒拉一次增量：两端同时开着，一边说话另一边能看到 */
-setInterval(function () {
-  if (busy) return;
-  loadHistory(false);
-}, 3000);
-document.addEventListener("visibilitychange", function () {
-  if (!document.hidden && !busy) loadHistory(false);
-});
-window.addEventListener("focus", function () {
-  if (!busy) loadHistory(false);
-});
-
-let speakingBtn = null;
-async function toggleSpeak(btn, text) {
-  if (speakingBtn === btn) {
-    stopAudio();
-    if (NATIVE) await call("ttsStop", {}).catch(function () {});
-    btn.classList.remove("on");
-    btn.textContent = "🔊 朗读";
-    speakingBtn = null;
-    return;
-  }
-  if (speakingBtn) { speakingBtn.classList.remove("on"); speakingBtn.textContent = "🔊 朗读"; }
-  speakingBtn = btn;
-  btn.classList.add("on");
-  btn.textContent = "⏸ 停止";
-  try {
-    await call("tts", { text: String(text).slice(0, 500) });
-    if (NATIVE) {
-      const done = function () {
-        if (speakingBtn === btn) { btn.classList.remove("on"); btn.textContent = "🔊 朗读"; speakingBtn = null; }
-      };
-      setTimeout(done, Math.max(1500, String(text).length * 220));
-    }
-  } catch (e) {
-    btn.classList.remove("on");
-    btn.textContent = "🔊 朗读";
-    speakingBtn = null;
-    toast("朗读失败：" + e.message);
-  }
-}
-
-/* =========================================================
-   盯盘提醒：每 10 秒拉一次，服务端存最近 60 条
-   ========================================================= */
-let alertLast = Number(localStorage.getItem("gguf_alert_last") || 0);
-let alertBooted = false;
-let alertTimer = null;
-
-function showAlert(it) {
-  const hot = (Number(it.level) || 1) >= 3;
-  clearEmpty();
-  const box = document.createElement("div");
-  box.className = "msg alert" + (hot ? " hot" : "");
-  const b = document.createElement("div");
-  b.className = "bubble";
-  const head = document.createElement("div");
-  head.className = "head";
-  const ttl = document.createElement("div");
-  ttl.className = "ttl";
-  ttl.textContent = "⚠ " + (it.title || "提醒");
-  const tm = document.createElement("div");
-  tm.className = "tm";
-  tm.textContent = String(it.ts || "").slice(5, 16);
-  head.appendChild(ttl);
-  head.appendChild(tm);
-  const bd = document.createElement("div");
-  bd.className = "bd";
-  bd.textContent = it.body || "";
-  b.appendChild(head);
-  b.appendChild(bd);
-  box.appendChild(b);
-  const meta = document.createElement("div");
-  meta.className = "meta";
-  const ask = document.createElement("button");
-  ask.className = "speak";
-  ask.textContent = "问 GGUF";
-  ask.onclick = function () {
-    input.value = "刚才这条提醒我看到了，现在该怎么办？";
-    send();
-  };
-  meta.appendChild(ask);
-  box.appendChild(meta);
-  log.appendChild(box);
-  scrollDown();
-  call("buzz", { style: hot ? "heavy" : "medium" }).catch(function () {});
-  toast(it.title || "有新提醒");
-  if (hot) call("tts", { text: String(it.title || "") }).catch(function () {});
-}
-
-async function pollAlerts() {
-  if (document.hidden) return;
-  let d;
-  try {
-    d = await call("alerts", { since: alertLast });
-  } catch (e) {
-    return;
-  }
-  const p = (d && d.payload) || d || {};
-  const items = p.items || [];
-  const last = Number(p.last) || 0;
-  if (last && last < alertLast) {
-    alertLast = last;
-    localStorage.setItem("gguf_alert_last", alertLast);
-    return;
-  }
-  if (!alertBooted) {
-    alertBooted = true;
-    if (!alertLast) {
-      if (items.length) {
-        const newest = items[items.length - 1];
-        const ageMin = (Date.now() - Number(newest.id)) / 60000;
-        if ((ageMin >= 0 && ageMin < 30) || newest.tag === "sys") showAlert(newest);
-      }
-      alertLast = last;
-      localStorage.setItem("gguf_alert_last", alertLast);
-      return;
-    }
-  }
-  for (let i = 0; i < items.length; i++) showAlert(items[i]);
-  if (last > alertLast) {
-    alertLast = last;
-    localStorage.setItem("gguf_alert_last", alertLast);
-  }
-}
-
-function startAlertPolling() {
-  if (alertTimer) clearInterval(alertTimer);
-  alertTimer = setInterval(pollAlerts, 10000);
-  setTimeout(pollAlerts, 1500);
-  document.addEventListener("visibilitychange", function () {
-    if (!document.hidden) pollAlerts();
+/* ===== 原生桥层（手册约定：有原生走原生，fetch 兜底） ===== */
+var _seq=0,_cbs={};
+window.WJ={_cb:function(id,ok,payload){var f=_cbs[id];delete _cbs[id];if(f)f(ok,payload)}};
+function hasBridge(){return !!(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.api)}
+function callNative(action,params){
+  return new Promise(function(res){
+    var id='c'+(++_seq);_cbs[id]=function(ok,p){res({ok:ok,data:p})};
+    var m={action:action,id:id};if(params)for(var k in params)m[k]=params[k];
+    window.webkit.messageHandlers.api.postMessage(m);
   });
 }
 
-/* ---------- 发送 ---------- */
-async function send() {
-  const text = input.value.trim();
-  if (!text || busy) return;
-  stopAudio();
-  if (speakingBtn) { speakingBtn.classList.remove("on"); speakingBtn.textContent = "🔊 朗读"; speakingBtn = null; }
-  input.value = "";
-  autoGrow();
-  addMsg("user", text, false);
-  pendingText = text;
-  busy = true;
-  btnSend.disabled = true;
-  setStatus("正在思考…", "warn");
+var chat=document.getElementById('chat'),inp=document.getElementById('inp');
+var history=[],autoRead=true,curAudio=null,busy=false,nativePlaying=false;
+function toast(t){var el=document.getElementById('toast');el.textContent=t;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(function(){el.classList.remove('show')},2200)}
+function scrollEnd(){chat.scrollTop=chat.scrollHeight}
+function addMsg(role,text){
+  var d=document.createElement('div');d.className='msg '+role;
+  var b=document.createElement('div');b.className='bubble';b.textContent=text;
+  d.appendChild(b);chat.appendChild(d);scrollEnd();return b;
+}
 
-  const slot = addMsg("bot", "…", false);
-  const t0 = Date.now();
-
-  try {
-    const data = await call("chat", { text: text, session: sessionId, to: "gguf",
-                                      src: NATIVE ? "mobile" : "desktop" });
-    const reply = (data && data.reply) || "（空回答）";
-    slot.bubble.textContent = reply;
-    slot.box.className = "msg bot";
-    if (data) { remember(data.id_user); remember(data.id_bot); }
-    const meta = document.createElement("div");
-    meta.className = "meta";
-    const b = document.createElement("button");
-    b.className = "speak";
-    b.textContent = "🔊 朗读";
-    b.onclick = function () { toggleSpeak(b, reply); };
-    meta.appendChild(b);
-    slot.box.appendChild(meta);
-    setStatus("就绪 · " + ((Date.now() - t0) / 1000).toFixed(1) + "s", "ok");
-    scrollDown();
-  } catch (e) {
-    slot.bubble.textContent = "失败：" + e.message;
-    slot.box.className = "msg bot err";
-    setStatus("连接异常", "err");
-  } finally {
-    busy = false;
-    pendingText = "";
-    btnSend.disabled = false;
-    scrollDown();
+/* ===== TTS：原生桥优先（AVAudioPlayer 可停），fetch 兜底 ===== */
+function stopSpeak(){
+  if(nativePlaying){callNative('ttsStop');nativePlaying=false}
+  if(curAudio){try{curAudio.pause()}catch(e){}curAudio=null}
+}
+function speak(text){
+  if(!text)return;
+  stopSpeak();
+  if(hasBridge()){
+    nativePlaying=true;
+    callNative('tts',{text:text,server:API}).then(function(r){
+      nativePlaying=false;
+      if(!r.ok)toast('语音服务未启动');
+    });
+    return;
   }
+  fetch(API+'/tts',{method:'POST',headers:{'Content-Type':'application/json','X-Token':TOKEN},body:JSON.stringify({text:text})})
+  .then(function(r){if(!r.ok)throw 0;return r.blob()})
+  .then(function(blob){curAudio=new Audio(URL.createObjectURL(blob));curAudio.play();curAudio.onended=function(){curAudio=null}})
+  .catch(function(){toast('语音服务未启动')});
 }
-btnSend.onclick = send;
-
-input.addEventListener("input", autoGrow);
-function autoGrow() {
-  input.style.height = "auto";
-  input.style.height = Math.min(input.scrollHeight, 120) + "px";
-}
-input.addEventListener("keydown", function (e) {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+document.getElementById('ttsFloat').addEventListener('click',function(){
+  if(curAudio||nativePlaying){stopSpeak();return}
+  autoRead=!autoRead;this.classList.toggle('on',autoRead);
+  toast(autoRead?'语音朗读 已开启':'语音朗读 已关闭');
+  if(autoRead){var bs=chat.querySelectorAll('.msg.ai .bubble');if(bs.length)speak(bs[bs.length-1].textContent)}
 });
 
-/* ---------- 检查连接 / 清空 ---------- */
-btnCheck.onclick = async function () {
-  btnCheck.disabled = true;
-  setStatus("检查中…", "warn");
-  const t0 = Date.now();
-  try {
-    await call("health", {});
-    setStatus("电脑在线 · " + ((Date.now() - t0) / 1000).toFixed(1) + "s", "ok");
-    toast("GGUF 在线，可以说话");
-  } catch (e) {
-    setStatus("连不上电脑", "err");
-    toast("连不上：检查 8000 服务与网络");
-  } finally {
-    btnCheck.disabled = false;
+/* ===== 流式对话 =====
+   按 \n\n 切帧并保留半帧：直接对每个 TCP 块 split('\n') 会把被拆开的一帧
+   解析失败后静默丢弃，长回答会丢字。 */
+function send(){
+  var text=inp.value.trim();if(!text||busy)return;
+  inp.value='';busy=true;
+  addMsg('user',text);
+  var bub=addMsg('ai','');bub.classList.add('streaming');
+  history.push({role:'user',content:text});
+  if(history.length>24)history=history.slice(-24);
+
+  var acc='',buf='',demo=false;
+
+  function feed(str){
+    buf+=str;
+    var frames=buf.split('\n\n');
+    buf=frames.pop();
+    for(var i=0;i<frames.length;i++){
+      var lines=frames[i].split('\n');
+      for(var j=0;j<lines.length;j++){
+        var l=lines[j];
+        if(l.indexOf('data:')!==0)continue;
+        var d=l.slice(5).trim();
+        if(!d||d==='[DONE]')continue;
+        try{
+          var o=JSON.parse(d);
+          if(o.delta){acc+=o.delta;bub.textContent=acc;scrollEnd()}
+          if(o.meta&&o.meta.demo)demo=true;
+        }catch(e){}
+      }
+    }
   }
-};
 
-btnClear.onclick = async function () {
-  if (!confirm("清空当前对话？")) return;
-  stopAudio();
-  try { await call("reset", {}); } catch (e) {}
-  sessionId = "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-  localStorage.setItem("gguf_session", sessionId);
-  log.innerHTML = "";
-  const empty = document.createElement("div");
-  empty.className = "empty";
-  empty.innerHTML = "<b>新会话</b>按住话筒说话，松手即识别<br>也可以直接打字，回车发送";
-  log.appendChild(empty);
-  setStatus("已清空 · 新会话", "ok");
-};
-
-/* =========================================================
-   按住说话（原生录音）
-   ========================================================= */
-const CANCEL_DY = 60;
-let holding = false, canceling = false, startY = 0, pressTimer = null;
-
-function voiceSupported() {
-  return !!(H && H.voice);
-}
-function nativeVoice(cmd) {
-  if (voiceSupported()) H.voice.postMessage(cmd);
-}
-
-function startHold(e) {
-  if (busy) { toast("上一个问题还在回答"); return; }
-  if (!voiceSupported()) {
-    toast("网页版不支持按住说话，请用 App");
-    return;
+  function end(){
+    bub.classList.remove('streaming');
+    if(demo)toast('演示模式：引擎未启动，以上不是模型输出');
+    if(acc){history.push({role:'assistant',content:acc});history=history.slice(-24)}
+    if(autoRead&&acc)speak(acc);
+    busy=false;
   }
-  e.preventDefault();
-  holding = true;
-  canceling = false;
-  startY = (e.touches ? e.touches[0].clientY : e.clientY) || 0;
-  btnMic.classList.add("hold");
-  overlay.classList.add("show");
-  wave.classList.remove("cancel");
-  ovTip.classList.remove("cancel");
-  ovTip.textContent = "松开发送 · 上滑取消";
-  animateWave();
-  nativeVoice("down");
+
+  fetch(API+'/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Token':TOKEN},
+    body:JSON.stringify({text:text,messages:history.slice(0,-1)})})
+  .then(function(r){
+    if(r.status===401){askToken();throw new Error('连接码已更新，请重发');}
+    if(r.status===429)throw new Error('引擎正在处理上一轮，等几秒再发');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    if(!r.body||!r.body.getReader)throw new Error('当前环境不支持流式读取');
+    var reader=r.body.getReader(),dec=new TextDecoder();
+    function pump(){
+      return reader.read().then(function(res){
+        if(res.done){if(buf)feed('\n\n');return}
+        feed(dec.decode(res.value,{stream:true}));
+        return pump();
+      });
+    }
+    return pump();
+  })
+  .then(end)
+  .catch(function(e){
+    bub.classList.remove('streaming');
+    if(!acc)bub.textContent='[ 连接失败：请确认电脑端服务已启动 ]';
+    else toast('连接中断');
+    busy=false;
+  });
 }
-function moveHold(e) {
-  if (!holding) return;
-  const y = (e.touches ? e.touches[0].clientY : e.clientY) || 0;
-  const dy = startY - y;
-  if (dy > CANCEL_DY && !canceling) {
-    canceling = true;
-    wave.classList.add("cancel");
-    ovTip.classList.add("cancel");
-    ovTip.textContent = "松开手指，取消发送";
-  } else if (dy <= CANCEL_DY && canceling) {
-    canceling = false;
-    wave.classList.remove("cancel");
-    ovTip.classList.remove("cancel");
-    ovTip.textContent = "松开发送 · 上滑取消";
+document.getElementById('sendBtn').addEventListener('click',send);
+inp.addEventListener('keydown',function(e){if(e.key==='Enter')send()});
+
+/* ===== 语音输入：App 内按住说话（本机 SFSpeech 识别）；浏览器用自带识别 ===== */
+var micBtn=document.getElementById('micBtn'),recording=false;
+function startRec(){
+  if(recording)return;
+  callNative('recStart').then(function(r){
+    if(r.ok){recording=true;micBtn.classList.add('rec')}
+    else toast('无法录音：'+(r.data&&r.data.error||''));
+  });
+}
+function stopRec(){
+  if(!recording)return;
+  recording=false;micBtn.classList.remove('rec');
+  toast('识别中...');
+  callNative('recStop').then(function(r){
+    var t=r.ok&&r.data&&r.data.text;
+    if(t){inp.value=t;send()}else toast('没听清，再说一次');
+  });
+}
+if(hasBridge()){
+  micBtn.addEventListener('touchstart',function(e){e.preventDefault();startRec()});
+  micBtn.addEventListener('touchend',function(e){e.preventDefault();stopRec()});
+  micBtn.addEventListener('touchcancel',function(e){e.preventDefault();stopRec()});
+  micBtn.addEventListener('mousedown',function(e){e.preventDefault();startRec()});
+  micBtn.addEventListener('mouseup',function(e){e.preventDefault();stopRec()});
+  micBtn.addEventListener('contextmenu',function(e){e.preventDefault()});
+}else{
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){micBtn.style.display='none'}
+  else{
+    var rec=new SR();rec.lang='zh-CN';rec.interimResults=false;
+    rec.onresult=function(e){inp.value=e.results[0][0].transcript;send()};
+    rec.onend=function(){micBtn.classList.remove('rec')};
+    rec.onerror=function(){micBtn.classList.remove('rec');toast('没听清，再说一次')};
+    micBtn.addEventListener('click',function(){try{rec.start();micBtn.classList.add('rec')}catch(e){}});
   }
 }
-function endHold(e) {
-  if (!holding) return;
-  holding = false;
-  if (e && e.preventDefault) e.preventDefault();
-  btnMic.classList.remove("hold");
-  overlay.classList.remove("show");
-  stopWave();
-  nativeVoice(canceling ? "cancel" : "up");
-  if (canceling) toast("已取消");
-  canceling = false;
-}
-btnMic.addEventListener("touchstart", startHold, { passive: false });
-btnMic.addEventListener("touchmove", moveHold, { passive: false });
-btnMic.addEventListener("touchend", endHold, { passive: false });
-btnMic.addEventListener("touchcancel", endHold, { passive: false });
-btnMic.addEventListener("mousedown", startHold);
-window.addEventListener("mousemove", moveHold);
-window.addEventListener("mouseup", endHold);
 
-/* 录音时的波形动画（假波形，纯视觉） */
-const bars = Array.prototype.slice.call(wave.children);
-let waveTimer = null;
-function animateWave() {
-  stopWave();
-  waveTimer = setInterval(function () {
-    bars.forEach(function (b) {
-      b.style.height = (6 + Math.random() * 26).toFixed(0) + "px";
+/* ===== 状态轮询（/health 返回 engine=online/standby；连不上引导改地址） ===== */
+function health(){
+  if(hasBridge()){
+    callNative('health',{server:API}).then(function(r){
+      if(r.ok){
+        window._askedServer=false;
+        var h=(typeof r.data==='string')?(function(){try{return JSON.parse(r.data)}catch(e){return {}}})():r.data;
+        var e=h.engine==='online'||h.engine==='standby';
+        document.getElementById('dotE').className='dot '+(e?'ok':'bad');
+        document.getElementById('dotT').className='dot '+(h.tts?'ok':'bad');
+      }else if(!window._askedServer){
+        window._askedServer=true;
+        addMsg('sys','[ 连不上 '+API+' · 点发送旁重试或修改地址 ]');
+        if(askServer()){toast('地址已更新，正在重连');health()}
+      }else{
+        document.getElementById('dotE').className='dot bad';
+        document.getElementById('dotT').className='dot bad';
+      }
     });
-  }, 90);
-}
-function stopWave() {
-  if (waveTimer) { clearInterval(waveTimer); waveTimer = null; }
-  bars.forEach(function (b) { b.style.height = "8px"; });
-}
-
-/* 原生识别结果回填 */
-window.__ggufAsr = function (text, ok, err) {
-  if (!ok) {
-    setStatus("识别失败", "err");
-    toast("识别失败：" + (err || "请重试"));
     return;
   }
-  const t = String(text || "").trim();
-  if (!t) { toast("没听清，再说一次"); return; }
-  input.value = t;
-  autoGrow();
-  setStatus("已识别", "ok");
-  send();
-};
-
-window.__ggufStatus = function (text, level) {
-  setStatus(text, level || "");
-};
-
-window.__ggufTtsDone = function () {
-  if (speakingBtn) {
-    speakingBtn.classList.remove("on");
-    speakingBtn.textContent = "🔊 朗读";
-    speakingBtn = null;
-  }
-};
-
-/* =========================================================
-   启动自检
-   ========================================================= */
-(async function boot() {
-  apiFetch("/__page?v=" + BUILD + "&native=" + (NATIVE ? 1 : 0) +
-           "&api=" + encodeURIComponent(API), { cache: "no-store" }).catch(function () {});
-  startAlertPolling();
-  if (!NATIVE && !voiceSupported()) {
-    setStatus("网页调试模式 · " + API, "warn");
-    return;
-  }
-  setStatus("连接电脑…", "warn");
-  try {
-    const t0 = Date.now();
-    await call("health", {});
-    try {
-      const n = await loadHistory(true);
-      if (n) setStatus("已同步上次对话 · " + n + " 条 · 电脑在线", "ok");
-    } catch (e2) {}
-    if (!log.querySelector(".msg")) setStatus("电脑在线 · " + ((Date.now() - t0) / 1000).toFixed(1) + "s · 可以说话", "ok");
-  } catch (e) {
-    setStatus("连不上电脑 · 检查 8000 服务或网络", "err");
-  }
-})();
+  fetch(API+'/health').then(function(r){return r.json()}).then(function(h){
+    window._askedServer=false;
+    var e=h.engine==='online'||h.engine==='standby';
+    document.getElementById('dotE').className='dot '+(e?'ok':'bad');
+    document.getElementById('dotT').className='dot '+(h.tts?'ok':'bad');
+  }).catch(function(){
+    /* 地址不对就一直白屏，看不出原因——失败时给一次改的机会 */
+    if(location.protocol==='file:'&&!window._askedServer){
+      window._askedServer=true;
+      if(askServer()){toast('地址已更新，正在重连');health()}
+    }
+  });
+}
+/* 启动时先用原生存的地址覆盖（UserDefaults 比 localStorage 可靠） */
+if(hasBridge()){
+  callNative('getServer').then(function(r){
+    if(r.ok&&r.data){try{var o=JSON.parse(r.data);if(o.server){SERVER_IP=o.server;API=o.server}}catch(e){}}
+    health();
+  });
+}else{
+  health();
+}
+setInterval(health,10000);
 </script>
 </body>
 </html>

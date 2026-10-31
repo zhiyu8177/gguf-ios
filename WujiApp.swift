@@ -3,9 +3,12 @@ import WebKit
 import AVFoundation
 import Speech
 
-/// GGUF 工作台手机壳：电脑的蒲公英虚拟 IP（172.16.2.103）· GGUF 8000 端口
-/// 换 IP 只改这一处 + ios/index.html 里的 DEFAULT_SERVER
-let SERVER = "http://172.16.2.103:8000"
+/// AgentShell 期货工作台手机壳（v1.2 重写版）
+/// 默认连电脑蒲公英虚拟 IP 的 AgentShell 手机服务（8099）。
+/// 地址存在 UserDefaults（键 wuj_server），App 内可改、重启保留；
+/// WKUIDelegate 已实现，JS 的 window.prompt 可正常弹出输入框。
+let DEFAULT_SERVER = "http://172.16.2.103:8099"
+let SERVER_KEY = "wuj_server"
 
 @main
 struct GGUFApp: App {
@@ -22,7 +25,11 @@ struct ContentView: View {
 }
 
 /// 用 @StateObject 强持有原生桥，避免 SwiftUI 提前释放 Coordinator
-/// 导致启动后 JS 调原生桥（health）时野指针闪退（拾壹同款模式）
+func currentServer() -> String {
+    let s = UserDefaults.standard.string(forKey: SERVER_KEY) ?? ""
+    return s.isEmpty ? DEFAULT_SERVER : s
+}
+
 final class BridgeHolder: ObservableObject {
     let bridge = Coordinator()
 }
@@ -35,10 +42,10 @@ struct WebViewContainer: UIViewRepresentable {
         cfg.allowsInlineMediaPlayback = true
         let wv = WKWebView(frame: .zero, configuration: cfg)
         wv.scrollView.bounces = false
+        wv.uiDelegate = bridge          // 关键：没有这个 window.prompt 弹不出来
         bridge.webView = wv
         // iOS 16.0.x 的 WKWebView：loadFileURL 崩溃、baseURL 传 http 地址也崩溃，
         // 只能用 loadHTMLString + baseURL nil（已实测不闪退）。
-        // about: 下 localStorage 不可用由 index.html 的 try/catch 兜底（默认地址直连）。
         if let url = Bundle.main.url(forResource: "index", withExtension: "html"),
            let html = try? String(contentsOf: url, encoding: .utf8) {
             wv.loadHTMLString(html, baseURL: nil)
@@ -51,7 +58,7 @@ struct WebViewContainer: UIViewRepresentable {
 
 /// 原生桥：JS 调 window.webkit.messageHandlers.api.postMessage({action,id,...})
 /// 原生回调 window.WJ._cb(id, ok, payloadJsonString)
-class Coordinator: NSObject, WKScriptMessageHandler {
+class Coordinator: NSObject, WKScriptMessageHandler, WKUIDelegate {
     weak var webView: WKWebView?
     var player: AVAudioPlayer?
 
@@ -68,13 +75,62 @@ class Coordinator: NSObject, WKScriptMessageHandler {
               let action = body["action"] as? String,
               let id = body["id"] as? String else { return }
         switch action {
-        case "tts":      tts(text: body["text"] as? String ?? "", id: id)
+        case "tts":      tts(text: body["text"] as? String ?? "", server: body["server"] as? String, id: id)
         case "ttsStop":  player?.stop(); reply(id, true, "{}")
-        case "health":   health(id: id)
+        case "health":   health(id: id, server: body["server"] as? String)
+        case "getServer": reply(id, true, "{\"server\":\(q(currentServer()))}")
+        case "setServer":
+            let s = (body["server"] as? String ?? "").trimmingCharacters(in: .whitespaces)
+            if !s.isEmpty, s.hasPrefix("http://") || s.hasPrefix("https://") {
+                UserDefaults.standard.set(s, forKey: SERVER_KEY)
+                reply(id, true, "{\"server\":\(q(s))}")
+            } else {
+                reply(id, false, "{\"error\":\"bad server\"}")
+            }
         case "recStart": recStart(id: id)
         case "recStop":  recStop(id: id)
         default:         reply(id, false, "{\"error\":\"unknown action\"}")
         }
+    }
+
+    // MARK: - WKUIDelegate：让 window.prompt / alert / confirm 正常工作
+    func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
+                 defaultText: String?, initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping (String?) -> Void) {
+        guard let root = rootVC() else { completionHandler(defaultText); return }
+        let alert = UIAlertController(title: prompt, message: nil, preferredStyle: .alert)
+        alert.addTextField { $0.text = defaultText }
+        alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
+            completionHandler(alert.textFields?.first?.text)
+        })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in completionHandler(nil) })
+        root.present(alert, animated: true)
+    }
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+        guard let root = rootVC() else { completionHandler(); return }
+        let alert = UIAlertController(title: message, message: nil, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "好", style: .default) { _ in completionHandler() })
+        root.present(alert, animated: true)
+    }
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+        guard let root = rootVC() else { completionHandler(false); return }
+        let alert = UIAlertController(title: message, message: nil, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in completionHandler(true) })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in completionHandler(false) })
+        root.present(alert, animated: true)
+    }
+    private func rootVC() -> UIViewController? {
+        let scenes = UIApplication.shared.connectedScenes
+        for scene in scenes {
+            if let ws = scene as? UIWindowScene, let key = ws.keyWindow {
+                var vc = key.rootViewController
+                while vc?.presentedViewController != nil { vc = vc?.presentedViewController }
+                return vc
+            }
+        }
+        return nil
     }
 
     // MARK: - 回调
@@ -88,17 +144,19 @@ class Coordinator: NSObject, WKScriptMessageHandler {
         return out
     }
 
-    // MARK: - TTS：电脑合成 → 原生播放（可精确停止）
-    func tts(text: String, id: String) {
+    // MARK: - TTS：电脑合成 → 原生播放（可精确停止）。AgentShell 暂无 /tts，会走失败分支
+    func tts(text: String, server: String?, id: String) {
         guard !text.isEmpty else { return reply(id, false, "{\"error\":\"empty\"}") }
-        var req = URLRequest(url: URL(string: SERVER + "/tts")!)
+        let base = (server?.isEmpty == false ? server! : currentServer())
+        var req = URLRequest(url: URL(string: base + "/tts")!)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try? JSONSerialization.data(withJSONObject: ["text": text])
-        req.timeoutInterval = 180
-        URLSession.shared.dataTask(with: req) { data, _, err in
-            guard let data = data, err == nil else {
-                return self.reply(id, false, "{\"error\":\"tts request failed\"}")
+        req.timeoutInterval = 60
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            guard let data = data, err == nil,
+                  (resp as? HTTPURLResponse)?.statusCode == 200 else {
+                return self.reply(id, false, "{\"error\":\"tts unavailable\"}")
             }
             DispatchQueue.main.async {
                 do {
@@ -114,13 +172,18 @@ class Coordinator: NSObject, WKScriptMessageHandler {
         }.resume()
     }
 
-    // MARK: - 健康检查
-    func health(id: String) {
-        URLSession.shared.dataTask(with: URL(string: SERVER + "/health")!) { data, _, err in
-            if let data = data, err == nil, let s = String(data: data, encoding: .utf8) {
+    // MARK: - 健康检查（带 JS 传来的地址，失败回 ok=false 让 JS 引导改地址）
+    func health(id: String, server: String?) {
+        let base = (server?.isEmpty == false ? server! : currentServer())
+        var req = URLRequest(url: URL(string: base + "/health")!)
+        req.timeoutInterval = 8
+        URLSession.shared.dataTask(with: req) { data, resp, err in
+            if let data = data, err == nil,
+               (resp as? HTTPURLResponse)?.statusCode == 200,
+               let s = String(data: data, encoding: .utf8) {
                 self.reply(id, true, self.q(s))
             } else {
-                self.reply(id, false, "{\"engine\":false,\"tts\":false}")
+                self.reply(id, false, "{\"engine\":\"offline\",\"tts\":false}")
             }
         }.resume()
     }
