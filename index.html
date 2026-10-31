@@ -25,6 +25,8 @@ body{background:radial-gradient(1200px 700px at 70% -10%,#0a1a30 0%,#050b16 55%,
 .bubble.streaming:after{content:'▍';color:var(--cyan);animation:blink .8s infinite;margin-left:2px}
 @keyframes blink{50%{opacity:0}}
 .sysb{text-align:center;color:var(--faint);font-size:11.5px;margin:8px 0;font-family:Consolas,monospace}
+.msg.sys{justify-content:center}
+.msg.sys .bubble{background:none;border:none;color:var(--faint);font-size:11.5px;max-width:100%;font-family:Consolas,monospace}
 .inputbar{display:flex;gap:8px;padding:10px 12px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:rgba(5,11,22,.95)}
 #inp{flex:1;background:#081222;border:1px solid var(--line);border-radius:22px;padding:11px 16px;color:var(--text);font-size:15px;outline:none}
 #inp:focus{border-color:var(--cyan)}
@@ -92,7 +94,9 @@ function callNative(action,params){
 }
 
 var chat=document.getElementById('chat'),inp=document.getElementById('inp');
-var history=[],autoRead=true,curAudio=null,busy=false,nativePlaying=false;
+/* 注意：不能用 history 做变量名——window.history 是不可写属性，var 覆盖无效，
+   后续 history.slice() 会抛 TypeError 让第一条消息永久卡死 */
+var hist=[],autoRead=true,curAudio=null,busy=false,nativePlaying=false;
 function toast(t){var el=document.getElementById('toast');el.textContent=t;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(function(){el.classList.remove('show')},2200)}
 function scrollEnd(){chat.scrollTop=chat.scrollHeight}
 function addMsg(role,text){
@@ -137,8 +141,8 @@ function send(){
   inp.value='';busy=true;
   addMsg('user',text);
   var bub=addMsg('ai','');bub.classList.add('streaming');
-  history.push({role:'user',content:text});
-  if(history.length>24)history=history.slice(-24);
+  hist.push({role:'user',content:text});
+  if(hist.length>24)hist=hist.slice(-24);
 
   var acc='',buf='',demo=false;
 
@@ -165,13 +169,13 @@ function send(){
   function end(){
     bub.classList.remove('streaming');
     if(demo)toast('演示模式：引擎未启动，以上不是模型输出');
-    if(acc){history.push({role:'assistant',content:acc});history=history.slice(-24)}
+    if(acc){hist.push({role:'assistant',content:acc});hist=hist.slice(-24)}
     if(autoRead&&acc)speak(acc);
     busy=false;
   }
 
   fetch(API+'/chat',{method:'POST',headers:{'Content-Type':'application/json','X-Token':TOKEN},
-    body:JSON.stringify({text:text,messages:history.slice(0,-1)})})
+    body:JSON.stringify({text:text,messages:hist.slice(0,-1)})})
   .then(function(r){
     if(r.status===401){askToken();throw new Error('连接码已更新，请重发');}
     if(r.status===429)throw new Error('引擎正在处理上一轮，等几秒再发');

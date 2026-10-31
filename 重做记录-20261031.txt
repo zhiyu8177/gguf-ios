@@ -1,0 +1,44 @@
+================================================================
+GGUF iOS 壳 · 彻底重做记录（去拾壹化）
+2026-10-31
+================================================================
+
+【问题】壳在"电脑连不上"时退回包内兜底页面，露出的还是拾壹界面。
+       当初只改了名字和地址，没真正重写。
+
+【本次重做内容】
+1. GGUFApp/index.html —— 彻底重写（GGUF 深色界面 #0d1117）：
+   - 标题：GGUF 手机端（原为拾壹风格）
+   - 去掉"壹/贰"角色切换按钮（拾壹/拾贰），只留 GGUF
+   - 桥协议名全部 gguf 化：window.__ggufCb / __ggufStatus /
+     __ggufAsr / __ggufTtsDone（原 __shiyi*）
+   - localStorage 键：gguf_session / gguf_alert_last（原 shiyi_*）
+   - 保留全部有用功能：候选地址自动探测切换（172.16.2.103 →
+     192.168.1.8）、历史共享同步（3 秒增量轮询）、盯盘提醒
+     （10 秒轮询 + 震动 + 问GGUF）、TTS 朗读、按住说话
+     （上滑取消）、清空/检查、手动改服务器地址、网页调试模式
+2. GGUFApp/GGUFApp.swift —— 桥协议名同步替换为 __gguf*，
+   清理 shiyi 默认 to 参数
+3. GGUFTest/ 测试壳 —— 与正式壳对齐（index.html 同款重写，
+   Swift 同款替换），标题不再是"拾壹 · 本地 Agent"
+
+【保留功能清单（原样保留）】
+- 候选地址自动探测（SERVER_CANDIDATES，先通先加载）
+- 原生语音识别 SFSpeech（按住说话/松手发送/上滑取消/打断TTS）
+- 原生朗读 AVAudioPlayer（/tts + ttsStop）
+- 历史共享（/history since 增量轮询，桌面手机同一份）
+- 盯盘提醒（/alerts + /manifest.json 兜底，buzz 震动）
+- 手动填服务器地址（点状态条，localStorage gguf_server）
+
+【验证】
+- 重写页 JS 语法：node --check OK
+- 桥协议名 HTML 定义 = Swift 调用：4 个全一致
+- GGUFApp + GGUFTest 全工程扫描：无 shiyi/拾壹 残留 ✓
+- 无冲突标记 ✓
+
+【版本与构建】
+- git 提交 v2.4（03dce1d），已推送 master →
+  GitHub Actions 自动构建新 IPA（GGUFApp + GGUFTest）
+- 构建完成后经 TrollStore 重装；旧壳文件均备份：
+  index.html.bak-20261031-拾壹旧版 / GGUFApp.swift.bak-20261031-拾壹旧版
+================================================================

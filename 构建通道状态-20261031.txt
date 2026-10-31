@@ -1,0 +1,25 @@
+================================================================
+GGUF iOS 壳 · 构建通道状态（补充）
+2026-10-31 08:00
+================================================================
+
+【代码重做：已完成并推送】
+  - git master 03dce1d（v2.4），已推送 github.com:zhiyu8177/gguf-ios
+  - GGUFApp/GGUFTest 双壳去拾壹化完成，残留清零，功能保留
+
+【构建：被 GitHub Actions 系统取消（非代码问题）】
+  run #24（07:54 push 触发）      → cancelled（秒级，无操作人）
+  run #25（07:58 手动 dispatch）  → cancelled（秒级，无操作人）
+  对比：昨天 11:54 的 run #23 还是 success。
+
+【判断】GitHub 免费账户 Actions 分钟配额耗尽（macOS runner
+  按 10 倍计费，昨天连续构建多次），新构建被系统拒绝。
+  billing API 本机无权限读取，需到网页确认。
+
+【待用户处理】
+  1. 打开 https://github.com/settings/billing 查看 Actions 分钟
+  2. 或打开仓库 Actions 页 https://github.com/zhiyu8177/gguf-ios/actions
+     看 run 取消原因
+  3. 处理方式：等额度重置 / 开通付费 / 或确认后网页 Re-run
+  4. 处理完告诉我，立即重新触发构建出 IPA
+================================================================

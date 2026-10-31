@@ -1,0 +1,28 @@
+================================================================
+GGUF iOS 壳重做 · 完成记录
+2026-10-31
+================================================================
+
+【代码】master 51320f4（v2.4.1）
+  - v2.4: 彻底重写 GGUFApp/GGUFTest 双壳（深色界面 + __gguf* 桥协议
+    + gguf_* 存储键），功能全保留，shiyi 清零
+  - v2.4.1: 注释措辞清理（包内无任何 shiyi/拾壹 字样）
+
+【构建】GitHub Actions 成功（run 41148253166, ~40s）
+  - 说明：07:54/07:58 两次 run 被系统秒取消属偶发（非配额），
+    08:02 与 08:06 两次 dispatch/push 均构建成功
+  - Release: v1793405182（公开可下载）
+  - 下载:
+    https://github.com/zhiyu8177/gguf-ios/releases/download/v1793405182/GGUFApp.ipa
+    https://github.com/zhiyu8177/gguf-ios/releases/download/v1793405182/GGUFTest.ipa
+
+【新 IPA（已验证）】
+  E:\GGUF_Web\GGUFApp_v2.4.1_20261031.ipa   （67661B）
+  E:\GGUF_Web\ios\dist\GGUFApp_v2.4.1_20261031.ipa
+  E:\GGUF_Web\ios\dist\GGUFTest_v2.4.1_20261031.ipa（70181B）
+  - 解包验证：包内 index.html = 重写版（GGUF 手机端 / BUILD
+    20261031-gguf / __ggufCb / 172.16.2.103），无 shiyi/拾壹 字样
+
+【安装】TrollStore 安装 GGUFApp_v2.4.1；装后"连不上电脑"时
+  显示 GGUF 自己的深色兜底页，不再是拾壹界面。
+================================================================

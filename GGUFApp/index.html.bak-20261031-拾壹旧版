@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
+<title>GGUF · 本地 Agent</title>
+<style>
+  :root {
+    --bg: #F5F4F1; --card: #FFFFFF; --line: #E2E0DA;
+    --text: #2C2C2A; --muted: #6B6A65; --hint: #9A9891;
+    --blue: #185FA5; --blue-soft: #E6F1FB; --blue-line: #B5D4F4;
+    --green: #3B6D11; --green-soft: #EAF3DE; --green-line: #C0DD97;
+    --amber: #854F0B; --amber-soft: #FAEEDA;
+    --red: #A32D2D; --red-soft: #FCEBEB; --red-line: #F0A9A9;
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.5;
+    display: flex; flex-direction: column;
+    height: 100vh; height: 100dvh;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* ---------- 顶栏 ---------- */
+  header {
+    flex: none; background: var(--card); border-bottom: 1px solid var(--line);
+    padding: calc(var(--safe-t) + 10px) 14px 9px;
+  }
+  .hrow { display: flex; align-items: center; gap: 10px; }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 11px; flex: none;
+    background: linear-gradient(135deg, #2F6FB0, #185FA5); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 600; letter-spacing: .5px;
+  }
+  .titles { min-width: 0; flex: 1; line-height: 1.3; }
+  .titles h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  .titles .sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .iconbtn {
+    width: 34px; height: 34px; flex: none; padding: 0; border-radius: 10px;
+    background: var(--bg); border: 1px solid var(--line); color: var(--muted);
+    font-size: 13px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .iconbtn:active { background: #ECEAE4; }
+  .iconbtn.warn { color: var(--red); border-color: var(--red-line); background: var(--red-soft); }
+  .statusline { display: flex; align-items: center; gap: 6px; margin-top: 8px; height: 16px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--hint); flex: none; }
+  .dot.ok { background: #4C9A2A; }
+  .dot.warn { background: #C98A12; }
+  .dot.err { background: #C0392B; }
+  #status { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ---------- 消息区 ---------- */
+  main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 14px 8px; }
+  .wrap { display: flex; flex-direction: column; gap: 16px; max-width: 720px; margin: 0 auto; }
+  .empty { text-align: center; color: var(--hint); font-size: 13px; padding: 34px 16px; line-height: 1.9; }
+  .empty b { display: block; font-size: 15px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+
+  .msg { display: flex; flex-direction: column; gap: 5px; max-width: 100%; }
+  .msg.user { align-items: flex-end; }
+  .msg.bot { align-items: flex-start; }
+  .bubble {
+    max-width: 86%; padding: 10px 14px; border-radius: 16px;
+    white-space: pre-wrap; word-break: break-word; line-height: 1.62;
+  }
+  .user .bubble { background: var(--blue); color: #fff; border-bottom-right-radius: 5px; }
+  .bot .bubble { background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
+
+  /* 盯盘提醒：和聊天消息区分开，一眼能认出是系统推的 */
+  .msg.alert { align-items: stretch; }
+  .alert .bubble {
+    background: var(--amber-soft); border: 1px solid #E8C89A;
+    border-left: 3px solid var(--amber); border-radius: 10px;
+    padding: 10px 12px; min-width: 0;
+  }
+  .alert.hot .bubble {
+    background: var(--red-soft); border-color: var(--red-line);
+    border-left-color: var(--red);
+  }
+  .alert .head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 5px; }
+  .alert .ttl { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; }
+  .alert.hot .ttl { color: var(--red); }
+  .alert .tm { color: var(--hint); font-size: 11px; flex: none; }
+  .alert .bd { white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
+  .err .bubble { background: var(--red-soft); border: 1px solid var(--red-line); color: var(--red); }
+  .meta { font-size: 11px; color: var(--hint); padding: 0 4px; display: flex; gap: 8px; align-items: center; }
+  .speak {
+    border: 1px solid var(--line); background: var(--card); color: var(--blue);
+    border-radius: 9px; padding: 2px 9px; font-size: 11.5px; cursor: pointer;
+  }
+  .speak.on { background: var(--blue-soft); border-color: var(--blue-line); }
+
+  .typing { display: flex; gap: 4px; padding: 4px 2px; }
+  .typing i {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--hint);
+    animation: blink 1.2s infinite;
+  }
+  .typing i:nth-child(2) { animation-delay: .18s; }
+  .typing i:nth-child(3) { animation-delay: .36s; }
+  @keyframes blink { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
+
+  /* ---------- 底栏 ---------- */
+  footer { flex: none; background: var(--card); border-top: 1px solid var(--line); padding: 10px 12px calc(10px + var(--safe-b)); }
+  .bar { display: flex; align-items: flex-end; gap: 8px; max-width: 720px; margin: 0 auto; }
+  #input {
+    flex: 1; min-height: 42px; max-height: 120px; resize: none;
+    padding: 10px 14px; border-radius: 21px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font: inherit; font-size: 16px; line-height: 1.4;
+    outline: none;
+  }
+  #input:focus { border-color: var(--blue-line); background: #fff; }
+  .round {
+    width: 42px; height: 42px; flex: none; padding: 0; border-radius: 50%;
+    border: 1px solid var(--line); background: var(--bg); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .12s, background .12s;
+  }
+  .round:active { transform: scale(.94); }
+  #btnSend { background: var(--blue); border-color: var(--blue); color: #fff; font-size: 13px; }
+  #btnSend:disabled { opacity: .45; }
+  #btnMic.rec { background: var(--red); border-color: var(--red); color: #fff; transform: scale(1.06); }
+  #btnMic.hold { background: #F3E2E2; border-color: var(--red-line); color: var(--red); }
+
+  /* ---------- 录音浮层 ---------- */
+  .overlay {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(30, 28, 24, .32); z-index: 50; padding: 24px;
+  }
+  .overlay.show { display: flex; }
+  .panel {
+    background: rgba(255,255,255,.97); border-radius: 18px; padding: 22px 26px;
+    text-align: center; min-width: 190px; box-shadow: 0 12px 34px rgba(0,0,0,.16);
+  }
+  .wave { display: flex; gap: 3px; justify-content: center; align-items: flex-end; height: 34px; margin-bottom: 12px; }
+  .wave span { width: 4px; border-radius: 2px; background: var(--blue); height: 8px; transition: height .08s linear; }
+  .wave.cancel span { background: var(--red); }
+  .panel .tip { font-size: 13px; color: var(--muted); }
+  .panel .tip.cancel { color: var(--red); font-weight: 600; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(84px + var(--safe-b)); transform: translate(-50%, 8px);
+    background: rgba(44,44,42,.92); color: #fff; font-size: 13px; padding: 8px 16px;
+    border-radius: 20px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 60;
+    max-width: 84vw; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <div class="avatar" id="avatar">壹</div>
+    <div class="titles">
+      <h1 id="whoTitle">GGUF</h1>
+      <div class="sub" id="whoSub">GGUF · 推理在本机 · 零Token消耗</div>
+    </div>
+    <button class="iconbtn" id="btnWho" title="切换对话对象">贰</button>
+    <button class="iconbtn" id="btnCheck" title="检查模型">检</button>
+    <button class="iconbtn warn" id="btnClear" title="清空对话">清</button>
+  </div>
+  <div class="statusline">
+    <span class="dot" id="dot"></span>
+    <span id="status" title="点我改电脑地址">正在连接电脑…</span>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap" id="log">
+    <div class="empty">
+      <b>GGUF 在这儿</b>
+      按住右下角话筒说话，松手即识别<br>
+      也可以直接打字，回车发送
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="bar">
+    <textarea id="input" rows="1" placeholder="输入问题，回车发送"></textarea>
+    <button class="round" id="btnMic" aria-label="按住说话">🎤</button>
+    <button class="round" id="btnSend">发送</button>
+  </div>
+</footer>
+
+<div class="overlay" id="overlay">
+  <div class="panel">
+    <div class="wave" id="wave"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="tip" id="ovTip">松开发送 · 上滑取消</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   接口层
+   在 App 里走原生桥（无跨域、无 ATS 问题、TTS 由原生播放）
+   在浏览器里自动退化成 fetch（电脑上直接调试用）
+   ========================================================= */
+/* 电脑地址候选（换了电脑/换了组网IP 只改这里，不用重编壳）：
+   浏览器直接打开时用同源地址；App 里是 file:// → 按顺序自动探测，谁通用谁 */
+/* 用户手动填的电脑地址（手机上点"连接异常/连不上电脑"红字可填写；本地保存，不用重装） */
+const CUSTOM = localStorage.getItem("gguf_server");
+const API_LIST = (CUSTOM ? [CUSTOM] : []).concat([
+  "http://172.16.2.103:8000",   // 本机（至强）蒲公英地址 · GGUF 8000（172.16.2.248 有线网卡已断，2026-10-30 换为 VPN 卡地址）
+  "http://192.168.1.8:8000"     // 手机与电脑同一 WiFi 时直连
+]);
+let API = (location.protocol === "http:" || location.protocol === "https:")
+  ? location.origin
+  : API_LIST[0];
+const H = window.webkit && window.webkit.messageHandlers;
+const NATIVE = !!(H && H.api);
+
+/* 页面版本号：改页面就改这里。
+   启动时打一条 /__page 到电脑端日志，"手机上跑的是哪版页面 / 是 App 还是浏览器 /
+   实际连的哪个地址" 一眼可查，不用再靠猜。 */
+const BUILD = "20261023-1100";
+
+let _seq = 0;
+const _pending = new Map();
+
+window.__shiyiCb = function (id, json) {
+  const p = _pending.get(id);
+  if (!p) return;
+  _pending.delete(id);
+  let msg;
+  try { msg = JSON.parse(json); } catch (e) { msg = { ok: false, error: "返回数据异常" }; }
+  if (msg && msg.ok) p.resolve(msg.data || {});
+  else p.reject(new Error((msg && msg.error) || "调用失败"));
+};
+
+function call(method, params) {
+  if (NATIVE) {
+    return new Promise((resolve, reject) => {
+      const id = ++_seq;
+      _pending.set(id, { resolve, reject });
+      H.api.postMessage({ id: id, method: method, params: params || {} });
+      setTimeout(() => {
+        if (_pending.has(id)) { _pending.delete(id); reject(new Error("等待超时")); }
+      }, 240000);
+    });
+  }
+  return httpCall(method, params || {});
+}
+
+let _audio = null;
+function playBlob(blob) {
+  stopAudio();
+  _audio = new Audio(URL.createObjectURL(blob));
+  _audio.play().catch(function () {});
+}
+
+function stopAudio() {
+  if (_audio) { try { _audio.pause(); } catch (e) {} _audio = null; }
+  if (NATIVE) { try { H.api.postMessage({ id: ++_seq, method: "ttsStop", params: {} }); } catch (e) {} }
+}
+
+/* 带地址切换的 fetch：当前地址连不上就顺次换下一个候选，成功后记住它 */
+async function apiFetch(path, opts) {
+  const sameOrigin = (location.protocol === "http:" || location.protocol === "https:");
+  const list = sameOrigin ? [API] : API_LIST;
+  let lastErr = null;
+  for (let i = 0; i < list.length; i++) {
+    try {
+      const r = await fetch(list[i] + path, opts);
+      if (!sameOrigin && API !== list[i]) API = list[i];
+      return r;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error("连不上电脑");
+}
+
+async function httpCall(method, p) {
+  if (method === "health") {
+    const r = await apiFetch("/health", { cache: "no-store" });
+    return await r.json();
+  }
+  if (method === "history") {
+    // 服务端落盘的共享历史：桌面端和手机端启动时都从这里回放
+    // p.since > 0 只取新增（增量轮询），否则取最近 limit 条
+    const since = Number(p.since || 0);
+    const limit = Number(p.limit || 60);
+    const qs = since > 0 ? ("?since=" + since + "&limit=" + limit) : ("?limit=" + limit);
+    const r = await apiFetch("/history" + qs, { cache: "no-store" });
+    return await r.json();
+  }
+  if (method === "reset") {
+    const r = await apiFetch("/api/reset", { method: "POST" });
+    return await r.json();
+  }
+  if (method === "chat") {
+    const r = await apiFetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: p.text, session_id: p.session, to: p.to })
+    });
+    const d = await r.json().catch(function () { return {}; });
+    if (!r.ok || d.error) throw new Error(d.error || ("服务返回 " + r.status));
+    return d;
+  }
+  if (method === "tts") {
+    const r = await apiFetch("/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: p.text })
+    });
+    if (!r.ok) throw new Error("语音合成失败");
+    playBlob(await r.blob());
+    return { playing: true };
+  }
+  if (method === "ttsStop") { stopAudio(); return {}; }
+  if (method === "alerts") {
+    const since = p.since || 0;
+    const r = await apiFetch("/alerts?since=" + since, { cache: "no-store" });
+    if (r.ok) return { payload: await r.json() };
+    // 电脑端还是旧代码（404）→ 改读静态清单。
+    // 8000 每次请求都重新读这个文件，所以不用重启服务也能拿到提醒。
+    const r2 = await apiFetch("/manifest.json", { cache: "no-store" });
+    const m = await r2.json();
+    const al = m.alerts || [];
+    return {
+      payload: {
+        items: al.filter(function (x) { return Number(x.id) > since; }),
+        last: al.length ? Number(al[al.length - 1].id) : 0
+      }
+    };
+  }
+  if (method === "buzz") return {};   // 浏览器里没有震动，静默跳过
+  throw new Error("未知方法 " + method);
+}
+
+/* =========================================================
+   界面
+   ========================================================= */
+const $ = function (id) { return document.getElementById(id); };
+const log = $("log"), main = $("main"), input = $("input");
+const btnSend = $("btnSend"), btnMic = $("btnMic"), btnWho = $("btnWho");
+const btnCheck = $("btnCheck"), btnClear = $("btnClear");
+const statusEl = $("status"), dot = $("dot");
+/* 点状态条 → 手动填电脑地址（存本地，立即重连） */
+statusEl.addEventListener("click", function () {
+  const cur = localStorage.getItem("gguf_server") || API_LIST[0];
+  const v = prompt("电脑地址（如 http://172.16.2.103:8000），留空用自动探测", cur);
+  if (v === null) return;
+  if (v.trim()) localStorage.setItem("gguf_server", v.trim());
+  else localStorage.removeItem("gguf_server");
+  location.reload();
+});
+const overlay = $("overlay"), ovTip = $("ovTip"), wave = $("wave");
+const toastEl = $("toast"), whoTitle = $("whoTitle"), whoSub = $("whoSub"), avatar = $("avatar");
+
+let mode = "shiyi";
+let busy = false;
+let pendingText = "";        // 本端刚发出的文字：轮询拿回来时据此去重
+let lastHistId = 0;          // 已同步到的最大消息 id
+const renderedIds = new Set();
+let sessionId = localStorage.getItem("shiyi_session");
+if (!sessionId) {
+  sessionId = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  localStorage.setItem("shiyi_session", sessionId);
+}
+
+function setStatus(text, level) {
+  statusEl.textContent = text;
+  dot.className = "dot" + (level ? " " + level : "");
+}
+
+let toastTimer = null;
+function toast(text) {
+  toastEl.textContent = text;
+  toastEl.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 1900);
+}
+
+function scrollDown() {
+  requestAnimationFrame(function () { main.scrollTop = main.scrollHeight; });
+}
+
+function clearEmpty() {
+  const e = log.querySelector(".empty");
+  if (e) e.remove();
+}
+
+function addMsg(role, text, withSpeak) {
+  clearEmpty();
+  const box = document.createElement("div");
+  box.className = "msg " + role;
+  const bubble = document.createElement("div");
+  bubble.className = "bubble";
+  if (text && text !== "…") bubble.textContent = text;
+  else if (text === "…") {
+    const t = document.createElement("div");
+    t.className = "typing";
+    t.innerHTML = "<i></i><i></i><i></i>";
+    bubble.appendChild(t);
+  }
+  box.appendChild(bubble);
+
+  if (role === "bot" && withSpeak) {
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const btn = document.createElement("button");
+    btn.className = "speak";
+    btn.textContent = "🔊 朗读";
+    btn.onclick = function () { toggleSpeak(btn, bubble.textContent); };
+    meta.appendChild(btn);
+    box.appendChild(meta);
+    box.__speakBtn = btn;
+  }
+  log.appendChild(box);
+  scrollDown();
+  return { box: box, bubble: bubble };
+}
+
+/* ---------- 历史同步：桌面端与手机端共用一份 ---------- */
+function remember(id) {
+  const n = Number(id || 0);
+  if (n > 0) {
+    renderedIds.add(n);
+    if (n > lastHistId) lastHistId = n;
+  }
+}
+
+function renderHist(m) {
+  const id = Number(m.id || 0);
+  if (id && renderedIds.has(id)) return;
+  if (id && m.role === "user" && pendingText && m.text === pendingText) {
+    // 就是本端刚发的那条，气泡已经在屏幕上了，只记 id 不重复渲染
+    remember(id);
+    return;
+  }
+  addMsg(m.role === "user" ? "user" : "bot", m.text, true);
+  remember(id);
+}
+
+/* 把服务端给的最大 id 记下来；就算服务端没带 last，也从 items 里自己推一遍。
+   2026-10-23：手机上出现 lastHistId 死锁在 0（每 3 秒重拉全量、还一条都不显示），
+   根因是包内 file:// 页面直接 fetch 被 WKWebView 跨源挡掉。
+   现在改成走 call()：App 里走原生桥，浏览器里走 fetch，两边都不受跨源限制。 */
+function appliedLast(d) {
+  const last = Number((d && d.last) || 0);
+  if (last > lastHistId) lastHistId = last;
+  const items = (d && d.items) || [];
+  for (const m of items) {
+    const n = Number(m.id || 0);
+    if (n > lastHistId) lastHistId = n;
+  }
+}
+
+async function loadHistory(initial) {
+  try {
+    const d = initial
+      ? await call("history", { limit: 60 })
+      : await call("history", { since: lastHistId, limit: 200 });
+    const items = (d && d.items) || [];
+    for (const m of items) renderHist(m);
+    appliedLast(d);
+    return items.length;
+  } catch (e) { return 0; }
+}
+
+// 每 3 秒拉一次增量：两端同时开着，一边说话另一边能看到
+// 2026-10-23：原来这里挡了 document.hidden（窗口最小化/被遮住就停轮询），
+// 电脑端窗口一被压到后面就"没反应"了。改成照拉，代价可以忽略。
+setInterval(function () {
+  if (busy) return;
+  loadHistory(false);
+}, 3000);
+
+// 窗口重新回到前台立刻补一次，不用等下一个 3 秒
+document.addEventListener("visibilitychange", function () {
+  if (!document.hidden && !busy) loadHistory(false);
+});
+window.addEventListener("focus", function () {
+  if (!busy) loadHistory(false);
+});
+
+let speakingBtn = null;
+async function toggleSpeak(btn, text) {
+  if (speakingBtn === btn) {
+    stopAudio();
+    if (NATIVE) await call("ttsStop", {}).catch(function () {});
+    btn.classList.remove("on");
+    btn.textContent = "🔊 朗读";
+    speakingBtn = null;
+    return;
+  }
+  if (speakingBtn) { speakingBtn.classList.remove("on"); speakingBtn.textContent = "🔊 朗读"; }
+  speakingBtn = btn;
+  btn.classList.add("on");
+  btn.textContent = "⏸ 停止";
+  try {
+    await call("tts", { text: String(text).slice(0, 500) });
+    if (NATIVE) {
+      const done = function () {
+        if (speakingBtn === btn) { btn.classList.remove("on"); btn.textContent = "🔊 朗读"; speakingBtn = null; }
+      };
+      setTimeout(done, Math.max(1500, String(text).length * 220));
+    }
+  } catch (e) {
+    btn.classList.remove("on");
+    btn.textContent = "🔊 朗读";
+    speakingBtn = null;
+    toast("朗读失败：" + e.message);
+  }
+}
+
+/* =========================================================
+   盯盘提醒
+   盯盘脚本把提醒塞进电脑端的 /alerts，这里每 10 秒拉一次。
+   App 切到后台时 JS 会被 iOS 冻住，回来再补拉，期间的提醒不会丢
+   （服务端存了最近 60 条）。
+   ========================================================= */
+let alertLast = Number(localStorage.getItem("shiyi_alert_last") || 0);
+let alertBooted = false;
+let alertTimer = null;
+
+function showAlert(it) {
+  const hot = (Number(it.level) || 1) >= 3;
+  clearEmpty();
+
+  const box = document.createElement("div");
+  box.className = "msg alert" + (hot ? " hot" : "");
+
+  const b = document.createElement("div");
+  b.className = "bubble";
+
+  const head = document.createElement("div");
+  head.className = "head";
+  const ttl = document.createElement("div");
+  ttl.className = "ttl";
+  ttl.textContent = "⚠ " + (it.title || "提醒");
+  const tm = document.createElement("div");
+  tm.className = "tm";
+  tm.textContent = String(it.ts || "").slice(5, 16);
+  head.appendChild(ttl);
+  head.appendChild(tm);
+
+  const bd = document.createElement("div");
+  bd.className = "bd";
+  bd.textContent = it.body || "";
+
+  b.appendChild(head);
+  b.appendChild(bd);
+  box.appendChild(b);
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const ask = document.createElement("button");
+  ask.className = "speak";
+  ask.textContent = "问 GGUF";
+  ask.onclick = function () {
+    input.value = "刚才这条提醒我看到了，现在该怎么办？";
+    send();
+  };
+  meta.appendChild(ask);
+  box.appendChild(meta);
+
+  log.appendChild(box);
+  scrollDown();
+
+  call("buzz", { style: hot ? "heavy" : "medium" }).catch(function () {});
+  toast(it.title || "有新提醒");
+  // 只有"极度紧张"才自动念出来，否则太吵
+  if (hot) call("tts", { text: String(it.title || "") }).catch(function () {});
+}
+
+async function pollAlerts() {
+  if (document.hidden) return;
+  let d;
+  try {
+    d = await call("alerts", { since: alertLast });
+  } catch (e) {
+    return;                     // 电脑没开/换网了，安静等下一轮
+  }
+  const p = (d && d.payload) || d || {};
+  const items = p.items || [];
+  const last = Number(p.last) || 0;
+
+  // 服务端被清过 / id 换过编号（last 比本地指针小）→ 直接对齐服务端，
+  // 不要归零：归零会把整段历史一次性弹出来，糊满一屏
+  if (last && last < alertLast) {
+    alertLast = last;
+    localStorage.setItem("shiyi_alert_last", alertLast);
+    return;
+  }
+
+  // 第一次跑且从没接过：不补弹历史（最多 30 条会刷屏），
+  // 但把半小时内最新那条亮出来 —— 相当于"通道已就绪"的回执
+  if (!alertBooted) {
+    alertBooted = true;
+    if (!alertLast) {
+      if (items.length) {
+        const newest = items[items.length - 1];
+        const ageMin = (Date.now() - Number(newest.id)) / 60000;
+        // 半小时内的正常提醒；"就绪回执"（tag=sys）不管隔多久都亮一次，
+        // 否则装完 App 没反应，分不清是没报警还是没通
+        if ((ageMin >= 0 && ageMin < 30) || newest.tag === "sys") showAlert(newest);
+      }
+      alertLast = last;
+      localStorage.setItem("shiyi_alert_last", alertLast);
+      return;
+    }
+  }
+
+  for (let i = 0; i < items.length; i++) showAlert(items[i]);
+  if (last > alertLast) {
+    alertLast = last;
+    localStorage.setItem("shiyi_alert_last", alertLast);
+  }
+}
+
+function startAlertPolling() {
+  if (alertTimer) clearInterval(alertTimer);
+  alertTimer = setInterval(pollAlerts, 10000);
+  setTimeout(pollAlerts, 1500);
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) pollAlerts();   // 回到前台立刻补一次
+  });
+}
+
+function setMode(m) {
+  mode = m;
+  whoTitle.textContent = "GGUF";
+  avatar.textContent = "壹";
+  whoSub.textContent = "GGUF · 推理在本机 · 零Token消耗";
+  btnWho.style.display = "none";
+  input.placeholder = "输入问题，回车发送";
+}
+btnWho.onclick = function () { setMode(mode === "shier" ? "shiyi" : "shier"); };
+
+/* ---------- 发送 ---------- */
+async function send() {
+  const text = input.value.trim();
+  if (!text || busy) return;
+  stopAudio();
+  if (speakingBtn) { speakingBtn.classList.remove("on"); speakingBtn.textContent = "🔊 朗读"; speakingBtn = null; }
+
+  input.value = "";
+  autoGrow();
+  addMsg("user", text, false);
+  pendingText = text;
+  busy = true;
+  btnSend.disabled = true;
+  setStatus("正在思考…", "warn");
+
+  const slot = addMsg("bot", "…", false);
+  const t0 = Date.now();
+
+  try {
+    const data = await call("chat", { text: text, session: sessionId, to: mode,
+                                      src: NATIVE ? "mobile" : "desktop" });
+    const reply = (data && data.reply) || "（空回答）";
+    slot.bubble.textContent = reply;
+    slot.box.className = "msg bot";
+    // 这两条服务端已入库，记下 id 免得轮询重复渲染
+    if (data) { remember(data.id_user); remember(data.id_bot); }
+    // 补上朗读按钮
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const b = document.createElement("button");
+    b.className = "speak";
+    b.textContent = "🔊 朗读";
+    b.onclick = function () { toggleSpeak(b, reply); };
+    meta.appendChild(b);
+    slot.box.appendChild(meta);
+    setStatus("就绪 · " + ((Date.now() - t0) / 1000).toFixed(1) + "s", "ok");
+    scrollDown();
+  } catch (e) {
+    slot.bubble.textContent = "失败：" + e.message;
+    slot.box.className = "msg bot err";
+    setStatus("连接异常", "err");
+  } finally {
+    busy = false;
+    pendingText = "";
+    btnSend.disabled = false;
+    scrollDown();
+  }
+}
+
+btnSend.onclick = send;
+
+input.addEventListener("input", autoGrow);
+function autoGrow() {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 120) + "px";
+}
+input.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+
+/* ---------- 检查模型 / 清空 ---------- */
+btnCheck.onclick = async function () {
+  btnCheck.disabled = true;
+  setStatus("检查中…", "warn");
+  const t0 = Date.now();
+  try {
+    await call("health", {});
+    setStatus("电脑在线 · " + ((Date.now() - t0) / 1000).toFixed(1) + "s", "ok");
+    toast("GGUF 在线，可以说话");
+  } catch (e) {
+    setStatus("连不上电脑", "err");
+    toast("连不上：检查 8000 服务与网络");
+  } finally {
+    btnCheck.disabled = false;
+  }
+};
+
+btnClear.onclick = async function () {
+  if (!confirm("清空当前对话？")) return;
+  stopAudio();
+  try { await call("reset", {}); } catch (e) {}
+  sessionId = "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  localStorage.setItem("shiyi_session", sessionId);
+  log.innerHTML = "";
+  const empty = document.createElement("div");
+  empty.className = "empty";
+  empty.innerHTML = "<b>新会话</b>按住话筒说话，松手即识别<br>也可以直接打字，回车发送";
+  log.appendChild(empty);
+  setStatus("已清空 · 新会话", "ok");
+};
+
+/* =========================================================
+   按住说话（原生录音）
+   ========================================================= */
+const CANCEL_DY = 60;
+let holding = false, canceling = false, startY = 0, pressTimer = null;
+
+function voiceSupported() {
+  return !!(H && H.voice);
+}
+function nativeVoice(cmd) {
+  if (voiceSupported()) H.voice.postMessage(cmd);
+}
+
+function startHold(e) {
+  if (busy) { toast("上一个问题还在回答"); return; }
+  if (!voiceSupported()) {
+    // 浏览器里没有原生录音：退化成提示
+    toast("网页版不支持按住说话，请用 App");
+    return;
+  }
+  e.preventDefault();
+  holding = true;
+  canceling = false;
+  startY = (e.touches ? e.touches[0].clientY : e.clientY) || 0;
+  btnMic.classList.add("hold");
+  overlay.classList.add("show");
+  wave.classList.remove("cancel");
+  ovTip.classList.remove("cancel");
+  ovTip.textContent = "松开发送 · 上滑取消";
+  animateWave();
+  nativeVoice("down");
+}
+
+function moveHold(e) {
+  if (!holding) return;
+  const y = (e.touches ? e.touches[0].clientY : e.clientY) || 0;
+  const dy = startY - y;
+  if (dy > CANCEL_DY && !canceling) {
+    canceling = true;
+    wave.classList.add("cancel");
+    ovTip.classList.add("cancel");
+    ovTip.textContent = "松开手指，取消发送";
+  } else if (dy <= CANCEL_DY && canceling) {
+    canceling = false;
+    wave.classList.remove("cancel");
+    ovTip.classList.remove("cancel");
+    ovTip.textContent = "松开发送 · 上滑取消";
+  }
+}
+
+function endHold(e) {
+  if (!holding) return;
+  holding = false;
+  if (e && e.preventDefault) e.preventDefault();
+  btnMic.classList.remove("hold");
+  overlay.classList.remove("show");
+  stopWave();
+  nativeVoice(canceling ? "cancel" : "up");
+  if (canceling) toast("已取消");
+  canceling = false;
+}
+
+btnMic.addEventListener("touchstart", startHold, { passive: false });
+btnMic.addEventListener("touchmove", moveHold, { passive: false });
+btnMic.addEventListener("touchend", endHold, { passive: false });
+btnMic.addEventListener("touchcancel", endHold, { passive: false });
+// 桌面浏览器按住说话（调试用）
+btnMic.addEventListener("mousedown", startHold);
+window.addEventListener("mousemove", moveHold);
+window.addEventListener("mouseup", endHold);
+
+/* 录音时的波形动画（假波形，纯视觉效果，不依赖原生电平） */
+const bars = Array.prototype.slice.call(wave.children);
+let waveTimer = null;
+function animateWave() {
+  stopWave();
+  waveTimer = setInterval(function () {
+    bars.forEach(function (b) {
+      b.style.height = (6 + Math.random() * 26).toFixed(0) + "px";
+    });
+  }, 90);
+}
+function stopWave() {
+  if (waveTimer) { clearInterval(waveTimer); waveTimer = null; }
+  bars.forEach(function (b) { b.style.height = "8px"; });
+}
+
+/* 原生识别结果回填 */
+window.__shiyiAsr = function (text, ok, err) {
+  if (!ok) {
+    setStatus("识别失败", "err");
+    toast("识别失败：" + (err || "请重试"));
+    return;
+  }
+  const t = String(text || "").trim();
+  if (!t) { toast("没听清，再说一次"); return; }
+  input.value = t;
+  autoGrow();
+  setStatus("已识别", "ok");
+  send();          // 识别完直接发出去
+};
+
+window.__shiyiStatus = function (text, level) {
+  setStatus(text, level || "");
+};
+
+/* 原生 TTS 播放结束回调 */
+window.__shiyiTtsDone = function () {
+  if (speakingBtn) {
+    speakingBtn.classList.remove("on");
+    speakingBtn.textContent = "🔊 朗读";
+    speakingBtn = null;
+  }
+};
+
+/* =========================================================
+   启动自检
+   ========================================================= */
+(async function boot() {
+  setMode("shiyi");
+  // 信标：先报到，再干活。这样即使后面某步炸了，电脑端日志也能看到手机跑的是哪版页面。
+  apiFetch("/__page?v=" + BUILD + "&native=" + (NATIVE ? 1 : 0) +
+           "&api=" + encodeURIComponent(API), { cache: "no-store" }).catch(function () {});
+  startAlertPolling();          // 盯盘提醒：跟连接状态无关，独立轮询
+  if (!NATIVE && !voiceSupported()) {
+    setStatus("网页调试模式 · " + API, "warn");
+    return;
+  }
+  setStatus("连接电脑…", "warn");
+  try {
+    const t0 = Date.now();
+    await call("health", {});
+    // 回放共享历史（桌面/手机同一份）：让打开的界面接着上次聊
+    try {
+      const n = await loadHistory(true);
+      if (n) setStatus("已同步上次对话 · " + n + " 条 · 电脑在线", "ok");
+    } catch (e2) {}
+    if (!log.querySelector(".msg")) setStatus("电脑在线 · " + ((Date.now() - t0) / 1000).toFixed(1) + "s · 可以说话", "ok");
+  } catch (e) {
+    setStatus("连不上电脑 · 检查 8000 服务或网络", "err");
+  }
+})();
+</script>
+</body>
+</html>

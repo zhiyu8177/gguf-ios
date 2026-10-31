@@ -122,15 +122,20 @@ class Coordinator: NSObject, WKScriptMessageHandler, WKUIDelegate {
         root.present(alert, animated: true)
     }
     private func rootVC() -> UIViewController? {
-        let scenes = UIApplication.shared.connectedScenes
-        for scene in scenes {
-            if let ws = scene as? UIWindowScene, let key = ws.keyWindow {
-                var vc = key.rootViewController
-                while vc?.presentedViewController != nil { vc = vc?.presentedViewController }
-                return vc
+        // keyWindow 是 iOS 15+ API，部署目标 14.0 必须带 #available 兜底
+        var key: UIWindow? = nil
+        if #available(iOS 15.0, *) {
+            for scene in UIApplication.shared.connectedScenes {
+                if let ws = scene as? UIWindowScene, let k = ws.keyWindow { key = k; break }
             }
         }
-        return nil
+        if key == nil {
+            for w in UIApplication.shared.windows where w.isKeyWindow { key = w; break }
+        }
+        guard let k = key else { return nil }
+        var vc = k.rootViewController
+        while vc?.presentedViewController != nil { vc = vc?.presentedViewController }
+        return vc
     }
 
     // MARK: - 回调
@@ -139,16 +144,20 @@ class Coordinator: NSObject, WKScriptMessageHandler, WKUIDelegate {
         DispatchQueue.main.async { self.webView?.evaluateJavaScript(js, completionHandler: nil) }
     }
     func q(_ s: String) -> String {
-        guard let d = try? JSONSerialization.data(withJSONObject: s),
-              let out = String(data: d, encoding: .utf8) else { return "\"\"" }
-        return out
+        // JSONSerialization 顶层只接受数组/字典，裸传 String 会失败——必须包一层数组再掐头去尾
+        guard let d = try? JSONSerialization.data(withJSONObject: [s], options: []),
+              let arr = String(data: d, encoding: .utf8), arr.count >= 2 else { return "\"\"" }
+        return String(arr.dropFirst().dropLast())
     }
 
     // MARK: - TTS：电脑合成 → 原生播放（可精确停止）。AgentShell 暂无 /tts，会走失败分支
     func tts(text: String, server: String?, id: String) {
         guard !text.isEmpty else { return reply(id, false, "{\"error\":\"empty\"}") }
         let base = (server?.isEmpty == false ? server! : currentServer())
-        var req = URLRequest(url: URL(string: base + "/tts")!)
+        guard let url = URL(string: base + "/tts") else {
+            return reply(id, false, "{\"error\":\"bad address\"}")
+        }
+        var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try? JSONSerialization.data(withJSONObject: ["text": text])
@@ -175,7 +184,10 @@ class Coordinator: NSObject, WKScriptMessageHandler, WKUIDelegate {
     // MARK: - 健康检查（带 JS 传来的地址，失败回 ok=false 让 JS 引导改地址）
     func health(id: String, server: String?) {
         let base = (server?.isEmpty == false ? server! : currentServer())
-        var req = URLRequest(url: URL(string: base + "/health")!)
+        guard let url = URL(string: base + "/health") else {
+            return reply(id, false, "{\"engine\":\"offline\",\"tts\":false}")
+        }
+        var req = URLRequest(url: url)
         req.timeoutInterval = 8
         URLSession.shared.dataTask(with: req) { data, resp, err in
             if let data = data, err == nil,
