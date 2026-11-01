@@ -24,6 +24,9 @@ final class ChatVM: ObservableObject {
 
     private var sse: SSEClient?
     private var timer: Timer?
+    private var pollTimer: Timer?
+    private var pollID: UInt64 = 0
+    private var pollFails = 0
     private var player: AVAudioPlayer?
 
     static let defaultServer = "http://172.16.2.103:8099"
@@ -34,7 +37,7 @@ final class ChatVM: ObservableObject {
         server = s.isEmpty ? ChatVM.defaultServer : s
     }
 
-    deinit { timer?.invalidate() }
+    deinit { timer?.invalidate(); pollTimer?.invalidate() }
 
     // MARK: - 服务地址
 
@@ -111,34 +114,71 @@ final class ChatVM: ObservableObject {
         let body: [String: Any] = ["text": t, "messages": hist]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        let c = SSEClient()
-        sse = c
+        // v2.1 轮询模式：POST /chat 秒回任务号，再每 1.5 秒 GET /poll?id=N 取结果。
+        // 之前的 SSE 长连接在蒲公英隧道上会悄悄断掉（电脑推数据才发现对面没了），
+        // 改成与健康检查相同的短请求方式——这种在你手机上已被证明稳定。
+        URLSession.shared.dataTask(with: req) { [weak self] data, resp, err in
+            guard let self = self else { return }
+            guard let d = data, err == nil,
+                  (resp as? HTTPURLResponse)?.statusCode == 200,
+                  let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+                  let id = (obj["id"] as? NSNumber)?.uint64Value, id > 0 else {
+                let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+                DispatchQueue.main.async {
+                    self.fail(aiID, code == 429 ? "引擎正在处理上一轮，等几秒再发" : "电脑没有接受（HTTP \(code)）")
+                }
+                return
+            }
+            self.pollID = id
+            DispatchQueue.main.async { self.startPolling(aiID) }
+        }.resume()
+    }
 
-        c.onDelta = { [weak self] delta in
+    private func startPolling(_ aiID: UUID) {
+        pollTimer?.invalidate()
+        pollFails = 0
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+            self?.pollOnce(aiID)
+        }
+    }
+
+    private func pollOnce(_ aiID: UUID) {
+        guard let url = URL(string: "\(server)/poll?id=\(pollID)") else { return }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 6
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, err in
             guard let self = self else { return }
-            if let i = self.msgs.firstIndex(where: { $0.id == aiID }) {
-                self.msgs[i].text += delta
+            guard let d = data, err == nil,
+                  let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else {
+                self.pollFails += 1
+                if self.pollFails >= 5 {
+                    DispatchQueue.main.async {
+                        self.pollTimer?.invalidate()
+                        self.fail(aiID, "电脑连不上了，检查蒲公英")
+                    }
+                }
+                return
             }
-        }
-        c.onDone = { [weak self] in
-            guard let self = self else { return }
-            if let i = self.msgs.firstIndex(where: { $0.id == aiID }) {
-                self.msgs[i].streaming = false
-                let full = self.msgs[i].text
-                if full.isEmpty { self.msgs[i].text = "[ 电脑没有返回内容 ]" }
-                else if self.autoRead { self.speak(full) }
+            self.pollFails = 0
+            let done = (obj["done"] as? Bool) ?? false
+            let text = (obj["text"] as? String) ?? ""
+            DispatchQueue.main.async {
+                guard let i = self.msgs.firstIndex(where: { $0.id == aiID }) else { return }
+                if !text.isEmpty { self.msgs[i].text = text }
+                if done {
+                    self.pollTimer?.invalidate()
+                    self.msgs[i].streaming = false
+                    if self.msgs[i].text.isEmpty { self.msgs[i].text = "[ 电脑没有返回内容 ]" }
+                    else if self.autoRead { self.speak(self.msgs[i].text) }
+                    self.busy = false
+                }
             }
-            self.busy = false
-            self.sse = nil
-        }
-        c.onError = { [weak self] err in
-            guard let self = self else { return }
-            self.fail(aiID, err)
-        }
-        c.start(req)
+        }.resume()
     }
 
     private func fail(_ id: UUID, _ err: String) {
+        pollTimer?.invalidate()
         if let i = msgs.firstIndex(where: { $0.id == id }) {
             msgs[i].streaming = false
             if msgs[i].text.isEmpty {

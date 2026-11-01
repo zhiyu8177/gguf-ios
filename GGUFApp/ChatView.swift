@@ -56,7 +56,7 @@ struct ChatView: View {
             Text("AgentShell 直连")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundColor(T.text)
-            Text("v2.0").font(.system(size: 10)).foregroundColor(T.dim)
+            Text("v2.1").font(.system(size: 10)).foregroundColor(T.dim)
 
             Spacer()
 
