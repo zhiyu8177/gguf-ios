@@ -43,7 +43,7 @@ body{background:radial-gradient(1200px 700px at 70% -10%,#0a1a30 0%,#050b16 55%,
 </head>
 <body>
 <div class="topbar">
-  <span class="ttl">AgentShell 遥控 <em style="font-size:11px;color:#8e8e93;font-style:normal">v1.2</em></span>
+  <span class="ttl">AgentShell 遥控 <em style="font-size:11px;color:#8e8e93;font-style:normal">v1.2.2</em></span>
   <span class="stat"><span class="dot bad" id="dotE"></span>引擎 <span class="dot bad" id="dotT"></span>语音</span>
 </div>
 <div class="chat" id="chat">
@@ -240,6 +240,15 @@ if(hasBridge()){
 }
 
 /* ===== 状态轮询（/health 返回 engine=online/standby；连不上引导改地址） ===== */
+/* v1.2.2：存的旧地址（可能是以前连 GGUF 8000 留下的）连不上时，自动切回默认地址重试，
+   不再死等；默认地址也失败才提示（大概率是 iOS 本地网络权限没给） */
+function useDefault(msg){
+  SERVER_IP=DEFAULT_SERVER;API=DEFAULT_SERVER;
+  try{localStorage.setItem('gguf_ip',DEFAULT_SERVER)}catch(e){}
+  if(hasBridge())callNative('setServer',{server:DEFAULT_SERVER});
+  addMsg('sys',msg);
+  health();
+}
 function health(){
   if(hasBridge()){
     callNative('health',{server:API}).then(function(r){
@@ -249,9 +258,12 @@ function health(){
         var e=h.engine==='online'||h.engine==='standby';
         document.getElementById('dotE').className='dot '+(e?'ok':'bad');
         document.getElementById('dotT').className='dot '+(h.tts?'ok':'bad');
+      }else if(API!==DEFAULT_SERVER){
+        window._askedServer=true;
+        useDefault('[ 旧地址 '+API+' 连不上，已切回默认地址 ]');
       }else if(!window._askedServer){
         window._askedServer=true;
-        addMsg('sys','[ 连不上 '+API+' · 点发送旁重试或修改地址 ]');
+        addMsg('sys','[ 连不上 '+API+' · 检查电脑端 AgentShell 是否开着，或到 设置→隐私与安全性→本地网络 打开 GGUF 的开关 ]');
         if(askServer()){toast('地址已更新，正在重连');health()}
       }else{
         document.getElementById('dotE').className='dot bad';
@@ -266,9 +278,11 @@ function health(){
     document.getElementById('dotE').className='dot '+(e?'ok':'bad');
     document.getElementById('dotT').className='dot '+(h.tts?'ok':'bad');
   }).catch(function(){
+    if(API!==DEFAULT_SERVER){window._askedServer=true;useDefault('[ 旧地址 '+API+' 连不上，已切回默认地址 ]');return}
     /* 地址不对就一直白屏，看不出原因——失败时给一次改的机会 */
     if(location.protocol==='file:'&&!window._askedServer){
       window._askedServer=true;
+      addMsg('sys','[ 连不上 '+API+' · 检查电脑端 AgentShell 是否开着，或到 设置→隐私与安全性→本地网络 打开 GGUF 的开关 ]');
       if(askServer()){toast('地址已更新，正在重连');health()}
     }
   });
