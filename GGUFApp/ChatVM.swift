@@ -20,6 +20,8 @@ final class ChatVM: ObservableObject {
     @Published var engineOK = false
     @Published var ttsOK = false
     @Published var autoRead = true
+    /// 一轮回答完成回调（通话模式用）：参数为最终回答文本，空串 = 失败/无内容
+    var onReplyDone: ((String) -> Void)?
     @Published private(set) var server: String
 
     private var sse: SSEClient?
@@ -172,6 +174,7 @@ final class ChatVM: ObservableObject {
                     if self.msgs[i].text.isEmpty { self.msgs[i].text = "[ 电脑没有返回内容 ]" }
                     else if self.autoRead { self.speak(self.msgs[i].text) }
                     self.busy = false
+                    self.onReplyDone?(self.msgs[i].text)
                 }
             }
         }.resume()
@@ -189,6 +192,7 @@ final class ChatVM: ObservableObject {
         }
         busy = false
         sse = nil
+        onReplyDone?("")
     }
 
     func stopSpeaking() {

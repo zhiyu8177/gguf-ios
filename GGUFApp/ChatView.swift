@@ -20,6 +20,8 @@ struct ChatView: View {
     @StateObject private var voice = VoiceIO()
 
     @State private var showSettings = false
+    @State private var showCall = false
+    @State private var autoReadBeforeCall = true
     @State private var holding = false
     @State private var toastText: String = ""
     @State private var toastOn = false
@@ -47,6 +49,11 @@ struct ChatView: View {
         }
         .onAppear(perform: setup)
         .sheet(isPresented: $showSettings) { SettingsView(vm: vm) }
+        .fullScreenCover(isPresented: $showCall, onDismiss: {
+            vm.autoRead = autoReadBeforeCall
+        }) {
+            CallView(chat: vm)
+        }
     }
 
     // MARK: - 顶栏
@@ -56,12 +63,21 @@ struct ChatView: View {
             Text("AgentShell 直连")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundColor(T.text)
-            Text("v2.1").font(.system(size: 10)).foregroundColor(T.dim)
+            Text("v2.2").font(.system(size: 10)).foregroundColor(T.dim)
 
             Spacer()
 
             dot(vm.engineOK); Text("引擎").font(.system(size: 10)).foregroundColor(T.dim)
             dot(vm.ttsOK).padding(.leading, 6); Text("语音").font(.system(size: 10)).foregroundColor(T.dim)
+
+            Button(action: {
+                autoReadBeforeCall = vm.autoRead
+                showCall = true
+            }) {
+                Image(systemName: "phone.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(T.cyan)
+            }.padding(.leading, 6)
 
             Button(action: { showSettings = true }) {
                 Image(systemName: "gearshape")

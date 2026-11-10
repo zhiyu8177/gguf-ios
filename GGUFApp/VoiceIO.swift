@@ -8,7 +8,11 @@ import Speech
 final class VoiceIO: ObservableObject {
 
     var onText: ((String) -> Void)?
+    var onPartial: ((String) -> Void)?
     var onError: ((String) -> Void)?
+
+    /// 免提通话模式：单次聆听最长秒数（到时把半截结果当最终结果），nil = 不限制
+    var maxListenSeconds: Double?
 
     private var engine: AVAudioEngine?
     private var request: SFSpeechAudioBufferRecognitionRequest?
@@ -18,6 +22,7 @@ final class VoiceIO: ObservableObject {
     private var active = false
     private var tapInstalled = false
     private var timeoutItem: DispatchWorkItem?
+    private var maxListenItem: DispatchWorkItem?
 
     /// 请求权限（麦克风 + 语音识别），首次调用会弹系统授权框
     func requestAuth(_ done: @escaping (Bool) -> Void) {
@@ -83,12 +88,25 @@ final class VoiceIO: ObservableObject {
         }
         engine = eng
 
+        // 免提模式：用户一直不停说也有上限，超时把已识别的半截当结果发出去
+        if let cap = maxListenSeconds {
+            let item = DispatchWorkItem { [weak self] in
+                guard let self = self, self.active else { return }
+                self.finish(text: self.lastPartial, error: nil)
+            }
+            maxListenItem = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + cap, execute: item)
+        }
+
         task = rec.recognitionTask(with: req) { [weak self] result, err in
             guard let self = self else { return }
             DispatchQueue.main.async {
                 if let r = result {
                     let t = r.bestTranscription.formattedString
-                    if !t.isEmpty { self.lastPartial = t }
+                    if !t.isEmpty {
+                        self.lastPartial = t
+                        self.onPartial?(t)
+                    }
                     if r.isFinal {
                         self.finish(text: t, error: nil)
                     }
@@ -118,6 +136,8 @@ final class VoiceIO: ObservableObject {
         active = false
         timeoutItem?.cancel()
         timeoutItem = nil
+        maxListenItem?.cancel()
+        maxListenItem = nil
         teardown()
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !t.isEmpty {
@@ -125,6 +145,17 @@ final class VoiceIO: ObservableObject {
         } else {
             onError?("没听清，再说一次")
         }
+    }
+
+    /// 免提/挂断用：静默停止，识别结果作废、不触发任何回调
+    func abort() {
+        active = false
+        timeoutItem?.cancel()
+        timeoutItem = nil
+        maxListenItem?.cancel()
+        maxListenItem = nil
+        lastPartial = ""
+        teardown()
     }
 
     private func stopEngine() {
