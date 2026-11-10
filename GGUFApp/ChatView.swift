@@ -54,6 +54,9 @@ struct ChatView: View {
         }) {
             CallScreen(chat: vm)
         }
+        .onChange(of: vm.server) { _ in
+            voice.serverURL = vm.server      // 换地址后录音上传跟着换
+        }
     }
 
     // MARK: - 顶栏
@@ -63,7 +66,7 @@ struct ChatView: View {
             Text("AgentShell 直连")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundColor(T.text)
-            Text("v2.2").font(.system(size: 10)).foregroundColor(T.dim)
+            Text("v2.3").font(.system(size: 10)).foregroundColor(T.dim)
 
             Spacer()
 
@@ -197,6 +200,7 @@ struct ChatView: View {
 
     private func setup() {
         vm.start()
+        voice.serverURL = vm.server          // v2.3 录音上传电脑 FunASR
         voice.requestAuth { _ in }
         voice.onText = { t in
             holding = false

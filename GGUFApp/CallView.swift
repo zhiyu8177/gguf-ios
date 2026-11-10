@@ -86,6 +86,7 @@ final class CallVM: ObservableObject {
         chat.autoRead = false        // 通话页自己管朗读，避免双重朗读
         chat.stopSpeaking()
         voice.maxListenSeconds = 15
+        voice.serverURL = chat.server      // v2.3 录音上传电脑 FunASR
         voice.onPartial = { [weak self] t in self?.liveText = t }
         voice.onText = { [weak self] t in self?.userSaid(t) }
         voice.onError = { [weak self] _ in self?.scheduleListenRetry() }
