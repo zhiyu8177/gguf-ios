@@ -313,7 +313,7 @@ struct CallView: View {
             }
 
             // 挂断
-            Button(action: { dismiss() }) {
+            Button(action: { dismiss.wrappedValue.dismiss() }) {
                 ZStack {
                     Circle().fill(T.bad)
                     Image(systemName: "phone.down.fill")
@@ -325,7 +325,7 @@ struct CallView: View {
             }
 
             // 回到文字聊天
-            Button(action: { dismiss() }) {
+            Button(action: { dismiss.wrappedValue.dismiss() }) {
                 ZStack {
                     Circle().fill(T.barBg)
                     Circle().stroke(T.line, lineWidth: 1.5)
