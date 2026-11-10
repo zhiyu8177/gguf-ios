@@ -72,7 +72,7 @@ final class VoiceIO: ObservableObject {
                 AVLinearPCMIsFloatKey: false,
                 AVLinearPCMIsBigEndianKey: false
             ]
-            guard let r = try? AVAudioRecorder(contentsOf: url, settings: settings) else {
+            guard let r = try? AVAudioRecorder(url: url, settings: settings) else {
                 active = false
                 onError?("录音启动失败")
                 return
@@ -209,16 +209,12 @@ final class VoiceIO: ObservableObject {
 
     private func upload(_ file: URL?) {
         guard let file = file else { onError?("录音文件丢失"); return }
-        guard let base = serverURL else {
-            fallbackFileASR(file, why: "没有电脑地址")
-            return
-        }
-        guard let data = try? Data(contentsOf: file) else {
-            fallbackFileASR(file, why: "录音读取失败")
-            return
-        }
-        guard let url = URL(string: base + "/asr") else {
-            fallbackFileASR(file, why: "电脑地址不对")
+        guard let base = serverURL, let data = try? Data(contentsOf: file),
+              let url = URL(string: base + "/asr") else {
+            // 电脑地址缺失/录音读不出来：本会话直接切回本机实时识别，不白录一趟
+            serverASR = false
+            cleanup(file)
+            onError?("电脑转写不可用，已切回本机识别")
             return
         }
         var req = URLRequest(url: url)
@@ -237,61 +233,22 @@ final class VoiceIO: ObservableObject {
                         self.cleanup(file)
                         self.onText?(t)
                     } else {
-                        // 电脑转出空：多半是没听清，按本机兜底再认一遍
-                        self.fallbackFileASR(file, why: "电脑没听清")
+                        self.cleanup(file)
+                        self.onError?("没听清，再说一次")
                     }
                 } else {
-                    // 电脑没接上 /asr（老版本 AgentShell 或断线）：本机兜底
+                    // 电脑没接上 /asr（老版本 AgentShell 或断线）：本会话改用本机实时识别
                     let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
-                    self.fallbackFileASR(file, why: "电脑转写不可用(\(code))")
+                    self.serverASR = false
+                    self.cleanup(file)
+                    self.onError?("电脑转写不可用(\(code))，已切回本机识别")
                 }
             }
         }.resume()
     }
 
-    /// 兜底：Apple 对录音文件做识别（SFSpeechFileRecognitionRequest），音频不出手机
-    private func fallbackFileASR(_ file: URL, why: String) {
-        guard speechGranted else {
-            cleanup(file)
-            onError?("电脑转写不可用(\(why))，且没有语音识别权限")
-            return
-        }
-        guard let rec = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN")), rec.isAvailable else {
-            cleanup(file)
-            onError?("电脑转写不可用(\(why))，本机识别也不可用")
-            return
-        }
-        let req = SFSpeechFileRecognitionRequest(url: file)
-        req.shouldReportPartialResults = false
-        var finished = false
-        let myTask = rec.recognitionTask(with: req) { [weak self] result, err in
-            DispatchQueue.main.async {
-                guard !finished else { return }
-                if let r = result, r.isFinal {
-                    finished = true
-                    self?.deliver(file, r.bestTranscription.formattedString)
-                } else if err != nil {
-                    finished = true
-                    self?.deliver(file, "")
-                }
-            }
-        }
-        task = myTask
-        // 5 秒还没结果就放弃
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            guard !finished else { return }
-            finished = true
-            myTask.cancel()
-            self.deliver(file, "")
-        }
-    }
-
-    private func deliver(_ file: URL, _ t: String) {
-        cleanup(file)
-        let s = t.trimmingCharacters(in: .whitespacesAndNewlines)
-        if s.isEmpty { onError?("没听清，再说一次") } else { onText?(s) }
-    }
-
+    /// v2.3 简化：不再对录音文件做 Apple 离线识别（新 SDK 已移除 SFSpeechFileRecognitionRequest），
+    /// 转写失败直接降级到本机实时通道
     private func cleanup(_ file: URL) {
         try? FileManager.default.removeItem(at: file)
     }
