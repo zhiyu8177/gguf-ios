@@ -52,7 +52,7 @@ struct ChatView: View {
         .fullScreenCover(isPresented: $showCall, onDismiss: {
             vm.autoRead = autoReadBeforeCall
         }) {
-            CallView(chat: vm)
+            CallScreen(chat: vm)
         }
     }
 

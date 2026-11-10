@@ -199,6 +199,16 @@ final class CallVM: ObservableObject {
     }
 }
 
+// MARK: - 通话界面入口（负责持有 CallVM）
+
+struct CallScreen: View {
+    @StateObject private var vm: CallVM
+    init(chat: ChatVM) {
+        _vm = StateObject(wrappedValue: CallVM(chat: chat))
+    }
+    var body: some View { CallView(vm: vm) }
+}
+
 // MARK: - 通话界面（豆包式全屏）
 
 struct CallView: View {
