@@ -33,6 +33,10 @@ final class VoiceIO: ObservableObject {
     // 服务器模式：AVAudioRecorder 直接出 16k 单声道 WAV
     private var recorder: AVAudioRecorder?
     private var recURL: URL?
+    // 免提模式静音断句（VAD）：用录音电平检测“说完一句”，静音 1.2 秒立刻上传
+    private var meterTimer: Timer?
+    private var speechSeen = false
+    private var quietTicks = 0
 
     /// 请求权限（麦克风 + 语音识别），首次调用会弹系统授权框
     func requestAuth(_ done: @escaping (Bool) -> Void) {
@@ -77,17 +81,19 @@ final class VoiceIO: ObservableObject {
                 onError?("录音启动失败")
                 return
             }
+            r.isMeteringEnabled = true
             r.record()
             recorder = r
             recURL = url
-            // 免提模式防呆：一直不说也有上限，超时自动按"结束"处理
-            if let cap = maxListenSeconds {
+            // 免提模式：电平 VAD 断句（说完静音 1.2s 立刻发）+ 15s 兜底上限
+            if maxListenSeconds != nil {
+                startVAD()
                 let item = DispatchWorkItem { [weak self] in
                     guard let self = self, self.active else { return }
                     self.finishUpload()
                 }
                 maxListenItem = item
-                DispatchQueue.main.asyncAfter(deadline: .now() + cap, execute: item)
+                DispatchQueue.main.asyncAfter(deadline: .now() + maxListenSeconds!, execute: item)
             }
             return
         }
@@ -161,11 +167,42 @@ final class VoiceIO: ObservableObject {
         }
     }
 
+    /// 免提通话断句：录音电平 > -38dB 视为在说话；说完连续静音 1.2 秒自动结束上传。
+    /// （只有免提模式启用；按住说话不受影响，仍以松手为准）
+    private func startVAD() {
+        speechSeen = false
+        quietTicks = 0
+        meterTimer?.invalidate()
+        let t = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            guard let self = self, self.active, let r = self.recorder else { return }
+            r.updateMeters()
+            let db = r.averagePower(forChannel: 0)
+            if db > -38 {
+                self.speechSeen = true
+                self.quietTicks = 0
+            } else if self.speechSeen {
+                self.quietTicks += 1
+                if self.quietTicks >= 12 {
+                    self.meterTimer?.invalidate()
+                    self.meterTimer = nil
+                    self.finishUpload()
+                }
+            }
+        }
+        meterTimer = t
+    }
+
+    private func stopVAD() {
+        meterTimer?.invalidate()
+        meterTimer = nil
+    }
+
     /// 松手：停止收音。服务器模式上传转写，本机模式等识别回调
     func stop() {
         guard active else { return }
         if serverASR {
             maxListenItem?.cancel(); maxListenItem = nil
+            stopVAD()
             finishUpload()
             return
         }
@@ -183,6 +220,7 @@ final class VoiceIO: ObservableObject {
     /// 免提/挂断用：静默停止，结果作废、不触发任何回调
     func abort() {
         active = false
+        stopVAD()
         timeoutItem?.cancel()
         timeoutItem = nil
         maxListenItem?.cancel()
@@ -199,6 +237,7 @@ final class VoiceIO: ObservableObject {
     private func finishUpload() {
         guard active else { return }
         active = false
+        stopVAD()
         maxListenItem?.cancel(); maxListenItem = nil
         recorder?.stop()
         let file = recURL

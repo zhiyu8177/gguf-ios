@@ -166,7 +166,11 @@ final class CallVM: ObservableObject {
         sp.speak(server: chat.server, text: reply) { [weak self, weak sp] in
             guard let self = self, !self.stopped else { return }
             if sp !== self.speaker { return }
-            self.beginListening()
+            // 稍等扬声器尾音散掉再开始听，防止回声被 VAD 当成人声
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                guard let self = self, !self.stopped else { return }
+                self.beginListening()
+            }
         }
     }
 
