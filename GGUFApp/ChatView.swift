@@ -21,6 +21,7 @@ struct ChatView: View {
 
     @State private var showSettings = false
     @State private var showCall = false
+    @State private var showMusic = false
     @State private var autoReadBeforeCall = true
     @State private var holding = false
     @State private var toastText: String = ""
@@ -49,6 +50,7 @@ struct ChatView: View {
         }
         .onAppear(perform: setup)
         .sheet(isPresented: $showSettings) { SettingsView(vm: vm) }
+        .sheet(isPresented: $showMusic) { MusicView(chatVM: vm) }
         .fullScreenCover(isPresented: $showCall, onDismiss: {
             vm.autoRead = autoReadBeforeCall
         }) {
@@ -66,12 +68,18 @@ struct ChatView: View {
             Text("AgentShell 直连")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundColor(T.text)
-            Text("v2.4").font(.system(size: 10)).foregroundColor(T.dim)
+            Text("v2.5").font(.system(size: 10)).foregroundColor(T.dim)
 
             Spacer()
 
             dot(vm.engineOK); Text("引擎").font(.system(size: 10)).foregroundColor(T.dim)
             dot(vm.ttsOK).padding(.leading, 6); Text("语音").font(.system(size: 10)).foregroundColor(T.dim)
+
+            Button(action: { showMusic = true }) {
+                Image(systemName: "music.note")
+                    .font(.system(size: 16))
+                    .foregroundColor(T.cyan)
+            }.padding(.leading, 6)
 
             Button(action: {
                 autoReadBeforeCall = vm.autoRead
