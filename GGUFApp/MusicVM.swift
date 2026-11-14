@@ -13,6 +13,12 @@ struct Track: Identifiable, Equatable {
 /// 声音只在手机出，电脑不播放（resolve 不触发电脑端播放器）。
 final class MusicVM: ObservableObject {
 
+    /// 【2026-11-14 聊天点歌桥】全局实例：聊天回复里的 [music:key=..] 由它播放，
+    /// 不依赖音乐页是否打开（AVPlayer 后台照样出声）。
+    static let shared = MusicVM(serverProvider: { MusicVM.globalServer })
+    /// ChatVM 每次改地址时同步过来（shared 实例拿不到 ChatVM 的闭包）
+    static var globalServer = ""
+
     @Published private(set) var tracks: [Track] = []
     @Published var filter: String = ""
     @Published private(set) var loaded = false
@@ -22,6 +28,9 @@ final class MusicVM: ObservableObject {
     @Published private(set) var playing = false
     /// 播完自动随机下一首
     @Published var autoNext = true
+    /// 【2026-11-14 聊天点歌桥】连播池过滤：聊天里点“有人声”时电脑端会标 src=ccMixter，
+    /// 播完接的下一首就只从该子库摇，不然 4480 首里八成是器乐，一句人声都没了
+    var autoNextFilter: String? = nil
 
     private var player: AVPlayer?
     private var endObs: NSObjectProtocol?
@@ -56,7 +65,7 @@ final class MusicVM: ObservableObject {
             loaded = false; lastError = "电脑地址不对，先在设置里改"; return
         }
         musicBase = base
-        guard let url = URL(string: base + "/library?limit=4000") else { return }
+        guard let url = URL(string: base + "/library?limit=8000") else { return }   // 曲库已 4480 首，原来 4000 会截断
         loading = true
         lastError = ""
         var req = URLRequest(url: url)
@@ -113,15 +122,53 @@ final class MusicVM: ObservableObject {
         }.resume()
     }
 
-    /// 随机来一首（排除当前这首）
+    /// 随机来一首（排除当前这首；带连播池过滤时只在该子库里摇）
     func playRandom() {
-        let pool = tracks
+        var pool = tracks
+        if let f = autoNextFilter {
+            let sub = pool.filter { $0.rel.localizedCaseInsensitiveContains(f) }
+            if !sub.isEmpty { pool = sub }
+        }
         guard !pool.isEmpty else { lastError = "曲库还没加载"; return }
         var t = pool.randomElement()!
         if pool.count > 1, t.name == nowTitle {
             while t.name == nowTitle { t = pool.randomElement()! }
         }
         play(t)
+    }
+
+    /// 【2026-11-14 聊天点歌桥】直接用电脑端硬通道给的流钥匙开播，不用再 resolve。
+    /// 聊天页说“放有人声歌曲”→ 电脑端回 [music:key=..|src=..|title=..] → 这里接手。
+    func playKey(_ key: String, title: String, filter: String?) {
+        if musicBase.isEmpty { musicBase = MusicVM.musicBase(from: serverProvider()) }
+        guard !musicBase.isEmpty else { lastError = "电脑地址不对"; return }
+        if let f = filter, !f.isEmpty, f != "all" { autoNextFilter = f } else { autoNextFilter = nil }
+        // 曲库没拉过就连播接不上（播完 playRandom 靠 tracks），后台先拉一把
+        if tracks.isEmpty { reload() }
+        startStream(musicBase + "/stream?k=" + key, title: title)
+    }
+
+    /// 解析电脑端硬通道附在回复尾部的标记，返回（去掉标记的正文, key, title, src）。
+    /// 格式：[music:key=881c080010|src=ccMixter|title=Vidian - The Reaper.mp3]
+    static func parseMusicTag(_ text: String) -> (cleaned: String, key: String, title: String, src: String?)? {
+        guard let start = text.range(of: "[music:key=") else { return nil }
+        guard let end = text.range(of: "]", range: start.upperBound..<text.endIndex) else { return nil }
+        let body = String(text[start.upperBound..<end.lowerBound])
+        var key = "", title = "", src: String? = nil
+        for part in body.split(separator: "|") {
+            let kv = part.split(maxSplits: 1, omittingEmptySubsequences: false) { $0 == "=" }
+            guard kv.count == 2 else { continue }
+            switch String(kv[0]) {
+            case "key": key = String(kv[1])
+            case "title": title = String(kv[1])
+            case "src": src = String(kv[1])
+            default: break
+            }
+        }
+        guard !key.isEmpty else { return nil }
+        var cleaned = text
+        cleaned.removeSubrange(start.lowerBound...end.lowerBound)
+        return (cleaned.trimmingCharacters(in: .whitespacesAndNewlines), key, title, src)
     }
 
     /// 播放/暂停切换

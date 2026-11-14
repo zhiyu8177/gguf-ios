@@ -9,7 +9,9 @@ struct MusicView: View {
 
     init(chatVM: ChatVM) {
         self.chatVM = chatVM
-        _m = StateObject(wrappedValue: MusicVM(serverProvider: { chatVM.server }))
+        // 【2026-11-14 聊天点歌桥】改用全局实例：聊天页点歌由 MusicVM.shared 播，
+        // 音乐页打开时要能看到"正在播"的状态并接管控制，必须同一个对象。
+        _m = StateObject(wrappedValue: MusicVM.shared)
     }
 
     var body: some View {

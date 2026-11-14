@@ -37,6 +37,7 @@ final class ChatVM: ObservableObject {
     init() {
         let s = UserDefaults.standard.string(forKey: ChatVM.serverKey) ?? ""
         server = s.isEmpty ? ChatVM.defaultServer : s
+        MusicVM.globalServer = server          // 聊天点歌桥：让 MusicVM.shared 能推 8321 地址
     }
 
     deinit { timer?.invalidate(); pollTimer?.invalidate() }
@@ -49,6 +50,7 @@ final class ChatVM: ObservableObject {
         var v = t
         if !v.hasPrefix("http://") && !v.hasPrefix("https://") { v = "http://" + v }
         server = v
+        MusicVM.globalServer = v               // 聊天点歌桥：地址改了同步给 MusicVM.shared
         UserDefaults.standard.set(v, forKey: ChatVM.serverKey)
         checkHealth()
     }
@@ -171,6 +173,15 @@ final class ChatVM: ObservableObject {
                 if done {
                     self.pollTimer?.invalidate()
                     self.msgs[i].streaming = false
+                    // 【2026-11-14 聊天点歌桥】电脑端硬通道在回复尾部附
+                    // [music:key=..|src=..|title=..]：剥掉再显示/朗读，同时拉流播放。
+                    // 声音从手机出（电脑端此时已自己 /stop 让出音响）。
+                    var finalText = self.msgs[i].text
+                    if let tag = MusicVM.parseMusicTag(finalText) {
+                        finalText = tag.cleaned
+                        self.msgs[i].text = finalText
+                        MusicVM.shared.playKey(tag.key, title: tag.title, filter: tag.src)
+                    }
                     if self.msgs[i].text.isEmpty { self.msgs[i].text = "[ 电脑没有返回内容 ]" }
                     else if self.autoRead { self.speak(self.msgs[i].text) }
                     self.busy = false
