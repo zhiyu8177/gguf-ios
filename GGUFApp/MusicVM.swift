@@ -235,7 +235,9 @@ final class MusicVM: ObservableObject {
 
     /// 【v3 核心】说话点歌：手机自己从曲库挑一首放，完全不经过聊天文本标记。
     /// - vocalOnly: 只要有人声的歌（ccMixter 子库）
-    func playLibrary(vocalOnly: Bool) {
+    /// - hint: 电脑回复原文。回复里常写"开始连播：<歌名>"，能在曲库里对上就直接放那首，
+    ///   免得聊天说的是一首、手机放的是另一首。对不上就回落到子库随机。
+    func playLibrary(vocalOnly: Bool, hint: String? = nil) {
         ensureLibrary { [weak self] in
             guard let self = self else { return }
             guard !self.tracks.isEmpty else {
@@ -252,6 +254,17 @@ final class MusicVM: ObservableObject {
                 self.autoNextFilter = "ccMixter"      // 播完接的下一首也在人声库里摇
             } else {
                 self.autoNextFilter = nil
+            }
+            // 先按回复里提到的歌名对号入座
+            if let h = hint, h.count > 4,
+               let hit = self.tracks.first(where: { t in
+                   let base = (t.name as NSString).deletingPathExtension
+                   return base.count > 3 && h.contains(base)
+               }) {
+                self.recent.append(hit.name)
+                if self.recent.count > 6 { self.recent.removeFirst() }
+                self.play(hit)
+                return
             }
             self.pickAndPlay(pool)
         }

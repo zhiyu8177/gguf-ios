@@ -189,7 +189,7 @@ final class ChatVM: ObservableObject {
                     var t = text
                     if let tag = MusicVM.parseMusicTag(t) { t = tag.cleaned }
                     self.msgs[i].text = t
-                    self.fireMusic()
+                    self.fireMusic(replyText: t)
                 }
                 if done {
                     self.pollTimer?.invalidate()
@@ -200,7 +200,7 @@ final class ChatVM: ObservableObject {
                         finalText = tag.cleaned
                         self.msgs[i].text = finalText
                     }
-                    self.fireMusic()
+                    self.fireMusic(replyText: self.msgs[i].text)
                     if self.msgs[i].text.isEmpty { self.msgs[i].text = "[ 电脑没有返回内容 ]" }
                     // 放歌时不朗读——朗读会抢占音频会话，把歌打断
                     else if self.autoRead && !self.musicFired { self.speak(self.msgs[i].text) }
@@ -213,14 +213,14 @@ final class ChatVM: ObservableObject {
 
     /// 【v3】一轮里只处理一次音乐：要停就停，要放就让手机自己从曲库点一首。
     /// 完全不依赖电脑端塞标记——旧方案任何一环掉链子就"标记原样显示 + 没有声音"。
-    private func fireMusic() {
+    private func fireMusic(replyText: String = "") {
         guard !musicFired else { return }
         if wantStopMusic {
             musicFired = true
             MusicVM.shared.stop()
         } else if wantMusic {
             musicFired = true
-            MusicVM.shared.playLibrary(vocalOnly: wantVocal)
+            MusicVM.shared.playLibrary(vocalOnly: wantVocal, hint: replyText)
         }
     }
 
