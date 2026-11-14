@@ -136,12 +136,17 @@ struct MusicView: View {
                 }
 
                 VStack(spacing: 2) {
-                    Text(m.nowTitle.isEmpty ? (m.loading ? "取流中…" : "点上面的歌，手机直接放") : m.nowTitle)
+                    Text(m.nowTitle.isEmpty ? (m.state.isActive ? m.state.text : "点上面的歌，手机直接放") : m.nowTitle)
                         .font(.system(size: 12))
                         .foregroundColor(m.nowTitle.isEmpty ? T.dim : T.text)
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .frame(maxWidth: .infinity)
+                    if !m.nowTitle.isEmpty && !m.state.isFailed {
+                        Text(m.state.text)
+                            .font(.system(size: 10))
+                            .foregroundColor(T.dim)
+                    }
                 }
 
                 Button(action: { m.playRandom() }) {

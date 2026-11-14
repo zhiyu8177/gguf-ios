@@ -18,6 +18,8 @@ enum T {
 struct ChatView: View {
     @StateObject private var vm = ChatVM()
     @StateObject private var voice = VoiceIO()
+    /// 全局播放器：聊天页常驻迷你播放条，能看到是否在播、失败在哪一步
+    @ObservedObject private var music = MusicVM.shared
 
     @State private var showSettings = false
     @State private var showCall = false
@@ -34,6 +36,8 @@ struct ChatView: View {
             VStack(spacing: 0) {
                 topBar
                 chatList
+                // 播放状态条：放了什么、卡在哪，一眼可见
+                if music.state.isActive { miniPlayer }
                 inputBar
             }
 
@@ -78,6 +82,16 @@ struct ChatView: View {
 
             dot(vm.engineOK); Text("引擎").font(.system(size: 10)).foregroundColor(T.dim)
             dot(vm.ttsOK).padding(.leading, 6); Text("语音").font(.system(size: 10)).foregroundColor(T.dim)
+
+            // 手机音频自检：听到"嘀"= 音频输出正常；听不到 = 静音拨片/音量/蓝牙跑偏
+            Button(action: {
+                MusicVM.testTone()
+                toast("听到嘀一声 = 手机音频正常；没听到就查静音拨片、音量、蓝牙耳机")
+            }) {
+                Image(systemName: "speaker.wave.2.fill")
+                    .font(.system(size: 15))
+                    .foregroundColor(T.dim)
+            }.padding(.leading, 6)
 
             Button(action: { showMusic = true }) {
                 Image(systemName: "music.note")
@@ -136,6 +150,55 @@ struct ChatView: View {
                 proxy.scrollTo("bottom", anchor: .bottom)
             }
         }
+    }
+
+    // MARK: - 迷你播放条
+
+    private var miniPlayer: some View {
+        HStack(spacing: 10) {
+            Image(systemName: music.state.isFailed ? "exclamationmark.triangle.fill"
+                                                  : (music.playing ? "waveform" : "music.note"))
+                .font(.system(size: 14))
+                .foregroundColor(music.state.isFailed ? T.bad : T.cyan)
+                .frame(width: 18)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(music.nowTitle.isEmpty ? "音乐" : music.nowTitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(T.text)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(music.state.text)
+                    .font(.system(size: 10))
+                    .foregroundColor(music.state.isFailed ? T.bad : T.dim)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 4)
+
+            Button(action: { music.toggle() }) {
+                Image(systemName: music.playing ? "pause.fill" : "play.fill")
+                    .font(.system(size: 15))
+                    .foregroundColor(T.cyan)
+                    .frame(width: 30, height: 30)
+            }
+            Button(action: { music.next() }) {
+                Image(systemName: "forward.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(T.text)
+                    .frame(width: 30, height: 30)
+            }
+            Button(action: { music.stop() }) {
+                Image(systemName: "stop.fill")
+                    .font(.system(size: 13))
+                    .foregroundColor(T.dim)
+                    .frame(width: 30, height: 30)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(T.barBg)
+        .overlay(Rectangle().frame(height: 1).foregroundColor(T.line), alignment: .top)
     }
 
     // MARK: - 输入区（微信式：点喇叭切语音模式，实心条按住说话）
@@ -373,6 +436,11 @@ struct SettingsView: View {
 
 @main
 struct GGUFAppMain: App {
+    init() {
+        // 启动即备好音频会话（.playback 忽略静音拨片），别等播放瞬间才激活
+        MusicVM.prepareSession()
+    }
+
     var body: some Scene {
         WindowGroup {
             ChatView()

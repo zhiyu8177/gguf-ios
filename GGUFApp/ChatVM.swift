@@ -29,8 +29,12 @@ final class ChatVM: ObservableObject {
     private var pollTimer: Timer?
     private var pollID: UInt64 = 0
     private var pollFails = 0
-    /// 【v2.6r3】本轮聊天点歌桥是否已触发过（每轮 send 重置，防 poll 重复拉流）
+    /// 【v3】本轮是否已处理过音乐（每轮 send 重置，防 poll 重复触发）
     private var musicFired = false
+    /// 【v3】本轮用户话里的音乐意图（send 时解析；手机据此自己点歌，不依赖电脑标记）
+    private var wantMusic = false
+    private var wantVocal = false
+    private var wantStopMusic = false
     private var player: AVAudioPlayer?
 
     static let defaultServer = "http://172.16.2.103:8099"
@@ -39,7 +43,8 @@ final class ChatVM: ObservableObject {
     init() {
         let s = UserDefaults.standard.string(forKey: ChatVM.serverKey) ?? ""
         server = s.isEmpty ? ChatVM.defaultServer : s
-        MusicVM.globalServer = server          // 聊天点歌桥：让 MusicVM.shared 能推 8321 地址
+        MusicVM.globalServer = server          // 播放器要拿 8321 地址
+        MusicVM.prepareSession()               // 启动就把音频会话备好
     }
 
     deinit { timer?.invalidate(); pollTimer?.invalidate() }
@@ -98,6 +103,12 @@ final class ChatVM: ObservableObject {
         guard !t.isEmpty, !busy else { return }
         input = ""
         busy = true
+        // 【v3】先看用户这句话要不要放歌——手机自己决定，不等电脑给标记
+        let intent = MusicIntent.parse(t)
+        wantMusic = intent.wantMusic
+        wantVocal = intent.vocal
+        wantStopMusic = intent.stop
+        musicFired = false
         msgs.append(Msg(role: .user, text: t))
         let ai = Msg(role: .ai, text: "", streaming: true)
         let aiID = ai.id
@@ -173,40 +184,44 @@ final class ChatVM: ObservableObject {
             DispatchQueue.main.async {
                 guard let i = self.msgs.firstIndex(where: { $0.id == aiID }) else { return }
                 if !text.isEmpty {
-                    // 【2026-11-14 v2.6r3】标记一出现就处理，不等 done——
-                    // 16:43 实测 done 不可靠（回复文本早到了，done 却迟迟不来，
-                    // 用户看到标记原样显示、也没声音）。首次发现标记立即拉流，
-                    // musicFired 防止后续 poll 重复触发播放。
+                    // 电脑端老版本仍可能塞 [music:..] 标记：只负责把标记剥干净再显示，
+                    // 播不播由用户这句话的意图决定（fireMusic），不再等电脑给钥匙。
                     var t = text
-                    if let tag = MusicVM.parseMusicTag(t) {
-                        t = tag.cleaned
-                        if !self.musicFired {
-                            self.musicFired = true
-                            MusicVM.shared.playKey(tag.key, title: tag.title, filter: tag.src)
-                        }
-                    }
+                    if let tag = MusicVM.parseMusicTag(t) { t = tag.cleaned }
                     self.msgs[i].text = t
+                    self.fireMusic()
                 }
                 if done {
                     self.pollTimer?.invalidate()
                     self.msgs[i].streaming = false
-                    // 兕底：done 时再剥一次（防最后一帧文本才带标记）
+                    // 兜底：万一文本帧没到（done 单独到），这里再试一次
                     var finalText = self.msgs[i].text
                     if let tag = MusicVM.parseMusicTag(finalText) {
                         finalText = tag.cleaned
                         self.msgs[i].text = finalText
-                        if !self.musicFired {
-                            self.musicFired = true
-                            MusicVM.shared.playKey(tag.key, title: tag.title, filter: tag.src)
-                        }
                     }
+                    self.fireMusic()
                     if self.msgs[i].text.isEmpty { self.msgs[i].text = "[ 电脑没有返回内容 ]" }
-                    else if self.autoRead { self.speak(self.msgs[i].text) }
+                    // 放歌时不朗读——朗读会抢占音频会话，把歌打断
+                    else if self.autoRead && !self.musicFired { self.speak(self.msgs[i].text) }
                     self.busy = false
                     self.onReplyDone?(self.msgs[i].text)
                 }
             }
         }.resume()
+    }
+
+    /// 【v3】一轮里只处理一次音乐：要停就停，要放就让手机自己从曲库点一首。
+    /// 完全不依赖电脑端塞标记——旧方案任何一环掉链子就"标记原样显示 + 没有声音"。
+    private func fireMusic() {
+        guard !musicFired else { return }
+        if wantStopMusic {
+            musicFired = true
+            MusicVM.shared.stop()
+        } else if wantMusic {
+            musicFired = true
+            MusicVM.shared.playLibrary(vocalOnly: wantVocal)
+        }
     }
 
     private func fail(_ id: UUID, _ err: String) {
@@ -251,5 +266,33 @@ final class ChatVM: ObservableObject {
                 } catch { }
             }
         }.resume()
+    }
+}
+
+// MARK: - 音乐意图
+
+/// 【v3】从用户这句话判断要不要放歌、放哪一类、还是让停。
+/// 手机端据此自己点歌，不再依赖电脑端在回复里塞 [music:key=..] 标记。
+struct MusicIntent {
+    var wantMusic = false
+    var vocal = false
+    var stop = false
+
+    static func parse(_ s: String) -> MusicIntent {
+        var i = MusicIntent()
+        let stopKeys = ["停止播放", "别放了", "不要放了", "别放", "不要放", "关掉音乐",
+                        "关音乐", "停止音乐", "别唱了", "停下音乐", "关了吧"]
+        if stopKeys.contains(where: { s.contains($0) }) {
+            i.stop = true
+            return i
+        }
+        let vocalKeys = ["人声", "唱歌", "唱的", "有词", "vocal", "歌曲", "流行"]
+        let musicKeys = ["播放", "放一首", "放首", "放点", "放个", "放歌", "放音乐",
+                         "来一首", "来点", "来首", "听听", "想听", "听歌", "整一首", "点歌"]
+        if musicKeys.contains(where: { s.contains($0) }) || vocalKeys.contains(where: { s.contains($0) }) {
+            i.wantMusic = true
+        }
+        if vocalKeys.contains(where: { s.contains($0) }) { i.vocal = true }
+        return i
     }
 }
