@@ -68,7 +68,9 @@ struct ChatView: View {
             Text("AgentShell 直连")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundColor(T.text)
-            Text("v2.5").font(.system(size: 10)).foregroundColor(T.dim)
+            // 版本动态读 Info.plist（v2.6 起不再手改这里，v2.5 就是手改漏掉导致"装了新版显示旧版"）
+            Text("v" + (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"))
+                .font(.system(size: 10)).foregroundColor(T.dim)
 
             Spacer()
 
