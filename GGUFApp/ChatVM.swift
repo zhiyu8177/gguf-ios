@@ -29,6 +29,8 @@ final class ChatVM: ObservableObject {
     private var pollTimer: Timer?
     private var pollID: UInt64 = 0
     private var pollFails = 0
+    /// 【v2.6r3】本轮聊天点歌桥是否已触发过（每轮 send 重置，防 poll 重复拉流）
+    private var musicFired = false
     private var player: AVAudioPlayer?
 
     static let defaultServer = "http://172.16.2.103:8099"
@@ -141,6 +143,7 @@ final class ChatVM: ObservableObject {
     private func startPolling(_ aiID: UUID) {
         pollTimer?.invalidate()
         pollFails = 0
+        musicFired = false
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
             self?.pollOnce(aiID)
         }
@@ -169,18 +172,33 @@ final class ChatVM: ObservableObject {
             let text = (obj["text"] as? String) ?? ""
             DispatchQueue.main.async {
                 guard let i = self.msgs.firstIndex(where: { $0.id == aiID }) else { return }
-                if !text.isEmpty { self.msgs[i].text = text }
+                if !text.isEmpty {
+                    // 【2026-11-14 v2.6r3】标记一出现就处理，不等 done——
+                    // 16:43 实测 done 不可靠（回复文本早到了，done 却迟迟不来，
+                    // 用户看到标记原样显示、也没声音）。首次发现标记立即拉流，
+                    // musicFired 防止后续 poll 重复触发播放。
+                    var t = text
+                    if let tag = MusicVM.parseMusicTag(t) {
+                        t = tag.cleaned
+                        if !self.musicFired {
+                            self.musicFired = true
+                            MusicVM.shared.playKey(tag.key, title: tag.title, filter: tag.src)
+                        }
+                    }
+                    self.msgs[i].text = t
+                }
                 if done {
                     self.pollTimer?.invalidate()
                     self.msgs[i].streaming = false
-                    // 【2026-11-14 聊天点歌桥】电脑端硬通道在回复尾部附
-                    // [music:key=..|src=..|title=..]：剥掉再显示/朗读，同时拉流播放。
-                    // 声音从手机出（电脑端此时已自己 /stop 让出音响）。
+                    // 兕底：done 时再剥一次（防最后一帧文本才带标记）
                     var finalText = self.msgs[i].text
                     if let tag = MusicVM.parseMusicTag(finalText) {
                         finalText = tag.cleaned
                         self.msgs[i].text = finalText
-                        MusicVM.shared.playKey(tag.key, title: tag.title, filter: tag.src)
+                        if !self.musicFired {
+                            self.musicFired = true
+                            MusicVM.shared.playKey(tag.key, title: tag.title, filter: tag.src)
+                        }
                     }
                     if self.msgs[i].text.isEmpty { self.msgs[i].text = "[ 电脑没有返回内容 ]" }
                     else if self.autoRead { self.speak(self.msgs[i].text) }

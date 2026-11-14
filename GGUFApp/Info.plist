@@ -19,7 +19,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>2.6</string>
 	<key>CFBundleVersion</key>
-	<string>26</string>
+	<string>27</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>GGUF需要访问你电脑所在的局域网/蒲公英组网，用来对话、语音识别和朗读</string>
 	<key>LSRequiresIPhoneOS</key>
