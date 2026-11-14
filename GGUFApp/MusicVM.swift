@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import UIKit
 
 /// 曲库单曲（index 是电脑端 /library 的顺序号，resolve 用它取流钥匙）
 struct Track: Identifiable, Equatable {
@@ -233,15 +234,23 @@ final class MusicVM: ObservableObject {
         pickAndPlay(pool)
     }
 
-    /// 【v3 核心】说话点歌：手机自己从曲库挑一首放，完全不经过聊天文本标记。
+    /// 【v4 核心】说话点歌：手机自己从曲库挑一首放，完全不经过聊天文本标记。
     /// - vocalOnly: 只要有人声的歌（ccMixter 子库）
     /// - hint: 电脑回复原文。回复里常写"开始连播：<歌名>"，能在曲库里对上就直接放那首，
     ///   免得聊天说的是一首、手机放的是另一首。对不上就回落到子库随机。
-    func playLibrary(vocalOnly: Bool, hint: String? = nil) {
+    /// - songHint: 用户这句话里点名的歌/歌手（"放安和桥"→安和桥）。
+    ///   曲库里有就精准播；**曲库里没有就跳酷狗搜这首**——这是零安装听正版歌的通道：
+    ///   不碰文件、不解密、不动版权，只是把"搜这首歌"这一步替用户做好。
+    func playLibrary(vocalOnly: Bool, hint: String? = nil, songHint: String? = nil) {
         ensureLibrary { [weak self] in
             guard let self = self else { return }
             guard !self.tracks.isEmpty else {
-                self.setFailed("曲库拉不到，手机上不了 8321")
+                // 连曲库都拉不到，但用户点了名：直接跳酷狗，别让他白等
+                if let sq = songHint, !sq.isEmpty {
+                    self.openKugouSearch(sq)
+                } else {
+                    self.setFailed("曲库拉不到，手机上不了 8321")
+                }
                 return
             }
             var pool = self.tracks
@@ -255,7 +264,18 @@ final class MusicVM: ObservableObject {
             } else {
                 self.autoNextFilter = nil
             }
-            // 先按回复里提到的歌名对号入座
+            // 1) 用户点名的歌：曲库有就精准播，没有就跳酷狗
+            if let sq = songHint, !sq.isEmpty {
+                if let hit = self.findTrack(sq) {
+                    self.recent.append(hit.name)
+                    if self.recent.count > 6 { self.recent.removeFirst() }
+                    self.play(hit)
+                } else {
+                    self.openKugouSearch(sq)
+                }
+                return
+            }
+            // 2) 电脑回复里提到的歌名对号入座
             if let h = hint, h.count > 4,
                let hit = self.tracks.first(where: { t in
                    let base = (t.name as NSString).deletingPathExtension
@@ -267,6 +287,63 @@ final class MusicVM: ObservableObject {
                 return
             }
             self.pickAndPlay(pool)
+        }
+    }
+
+    /// 曲库里按歌名/歌手/路径模糊找一首（去掉空格标点、忽略大小写）
+    private func findTrack(_ keyword: String) -> Track? {
+        let norm: (String) -> String = { s in
+            let base = (s as NSString).deletingPathExtension
+            return base.lowercased()
+                .replacingOccurrences(of: " ", with: "")
+                .replacingOccurrences(of: "-", with: "")
+                .replacingOccurrences(of: "_", with: "")
+                .replacingOccurrences(of: "《", with: "")
+                .replacingOccurrences(of: "》", with: "")
+        }
+        let k = norm(keyword)
+        guard !k.isEmpty else { return nil }
+        // 先找完全一致，再退到互相包含
+        if let exact = tracks.first(where: { norm($0.name) == k }) { return exact }
+        if let contains = tracks.first(where: { t in
+            let n = norm(t.name)
+            return n.contains(k) || (n.count >= 4 && k.contains(n))
+        }) { return contains }
+        return tracks.first(where: { norm($0.rel).contains(k) })
+    }
+
+    // MARK: - 曲库没有 → 跳酷狗（零安装通道）
+
+    /// 打开酷狗去搜这首歌。三层级联，任何一层成功就停：
+    /// 1) kugou://search?keyword=… （App 内搜索页，最快）
+    /// 2) kugou://（只唤起 App，用户自己点搜索）
+    /// 3) Safari 打开酷狗移动搜索页（网页会自己给"打开APP"，scheme 变了也不失效）
+    func openKugouSearch(_ keyword: String) {
+        let kw = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !kw.isEmpty else { return }
+        setState(.failed("曲库里没有《\(kw)》，正在打开酷狗…"))
+        silenceComputer()      // 电脑端硬通道多半已经随机放了一首，先让它闭嘴，别两边同时响
+        let enc = kw.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? kw
+        let schemeSearch = URL(string: "kugou://search?keyword=\(enc)")
+        let schemeBare = URL(string: "kugou://")
+        let web = URL(string: "https://m.kugou.com/search?keyword=\(enc)")
+
+        func open(_ url: URL?, then: @escaping () -> Void) {
+            guard let u = url else { then(); return }
+            DispatchQueue.main.async {
+                UIApplication.shared.open(u, options: [:]) { ok in
+                    if !ok { DispatchQueue.main.async { then() } }
+                }
+            }
+        }
+        open(schemeSearch) { [weak self] in
+            open(schemeBare) {
+                open(web) {
+                    DispatchQueue.main.async {
+                        self?.setState(.failed("跳转失败：手机上没有酷狗？"))
+                    }
+                }
+            }
         }
     }
 

@@ -35,6 +35,8 @@ final class ChatVM: ObservableObject {
     private var wantMusic = false
     private var wantVocal = false
     private var wantStopMusic = false
+    /// 【v4】用户点名的歌名（"放安和桥"）；曲库没有就跳酷狗搜
+    private var wantSong: String? = nil
     private var player: AVAudioPlayer?
 
     static let defaultServer = "http://172.16.2.103:8099"
@@ -108,6 +110,7 @@ final class ChatVM: ObservableObject {
         wantMusic = intent.wantMusic
         wantVocal = intent.vocal
         wantStopMusic = intent.stop
+        wantSong = intent.song
         musicFired = false
         msgs.append(Msg(role: .user, text: t))
         let ai = Msg(role: .ai, text: "", streaming: true)
@@ -220,7 +223,7 @@ final class ChatVM: ObservableObject {
             MusicVM.shared.stop()
         } else if wantMusic {
             musicFired = true
-            MusicVM.shared.playLibrary(vocalOnly: wantVocal, hint: replyText)
+            MusicVM.shared.playLibrary(vocalOnly: wantVocal, hint: replyText, songHint: wantSong)
         }
     }
 
@@ -273,10 +276,59 @@ final class ChatVM: ObservableObject {
 
 /// 【v3】从用户这句话判断要不要放歌、放哪一类、还是让停。
 /// 手机端据此自己点歌，不再依赖电脑端在回复里塞 [music:key=..] 标记。
+/// 【v4】再抽一句"点名的歌/歌手"：曲库有就精准播，没有就跳酷狗搜。
 struct MusicIntent {
     var wantMusic = false
     var vocal = false
     var stop = false
+    /// 用户点名的歌名/歌手（"放安和桥" → 安和桥）。泛泛的"放音乐""来点人声"为 nil。
+    var song: String? = nil
+
+    /// 只有这些词的不算点名（否则"放点音乐"会被当成歌名去搜）
+    private static let generic = [
+        "音乐", "歌曲", "歌", "人声", "纯音乐", "伴奏", "背景音乐", "轻音乐", "纯音",
+        "随便", "好听", "老歌", "新歌", "慢歌", "快歌", "dj", "电音", "摇滚", "流行",
+        "中文", "英文", "粤语", "日文", "韩文", "外文", "安静", "舒缓", "伤感", "欢快",
+        "睡前", "工作", "学习", "开车", "儿歌", "经典", "怀旧", "什么都行", "什么都好"
+    ]
+
+    private static let verbs = [
+        "播放一下", "播放", "放一首", "放首", "放一下", "放一个", "放点", "放个", "放",
+        "来一首", "来首", "来一个", "来点", "我想听", "想听", "听听", "听一下", "听",
+        "点一首", "点首", "点个", "唱一首", "唱首", "唱", "整一首", "整首"
+    ]
+
+    /// 从整句里剥出歌名：去掉动词、量词、句尾的"的歌/吧/呗"和标点
+    private static func extractSong(_ s: String) -> String? {
+        var hit: (String.Index, String)? = nil
+        for v in verbs {
+            if let r = s.range(of: v) {
+                if hit == nil || r.lowerBound < hit!.0 { hit = (r.lowerBound, v) }
+            }
+        }
+        guard let (idx, verb) = hit else { return nil }
+        var rest = String(s[idx...]).dropFirst(verb.count)
+        // 去掉残余的"一下/一点/一首"等量词
+        for p in ["一下", "一点", "一些", "一首", "一首歌", "首", "个", "点儿", "点"] {
+            if rest.hasPrefix(p) { rest = rest.dropFirst(p.count) }
+        }
+        var t = String(rest).trimmingCharacters(in: .whitespacesAndNewlines)
+        // 去掉句尾语气/后缀
+        for suf in ["的歌吧", "的歌好听吗", "的歌", "歌曲", "音乐", "吧", "呗", "好吗",
+                    "好不好", "可以吗", "行吗", "谢谢", "听听"] {
+            if t.hasSuffix(suf) { t = String(t.dropLast(suf.count)) }
+        }
+        t = t.trimmingCharacters(in: CharacterSet(charactersIn: " 《》\"'“”‘’，。！!？?、~～…"))
+        guard t.count >= 1, t.count <= 30 else { return nil }
+        let low = t.lowercased()
+        // 整句就是一个泛词 → 不算点名
+        if generic.contains(where: { low == $0 || low == $0.lowercased() }) { return nil }
+        // 只剩虚词、或者明显是请求句式 → 不算点名
+        let junk = ["音乐", "歌曲", "首歌", "一些", "什么", "怎么", "能不能", "可以", "一个", "点", "些"]
+        if junk.contains(where: { low == $0 }) { return nil }
+        if low.contains("音乐") || low.contains("歌曲") { return nil }
+        return t
+    }
 
     static func parse(_ s: String) -> MusicIntent {
         var i = MusicIntent()
@@ -293,6 +345,9 @@ struct MusicIntent {
             i.wantMusic = true
         }
         if vocalKeys.contains(where: { s.contains($0) }) { i.vocal = true }
+        // 单字"放"/"听"/"唱"+具体名字 也算点歌（"放安和桥"）
+        i.song = extractSong(s)
+        if i.song != nil { i.wantMusic = true }
         return i
     }
 }
