@@ -67,6 +67,21 @@ final class ChatVM: ObservableObject {
     }
     private static let serverKey = "wuj_server_v3"   // 换 key：老包里存的失效地址不再生效
 
+    /// 电脑端偶尔会把"工具调用"直接写成正文（35B 在工具链中途崩的时候，
+    /// 会吐 `[{"type":"run_command","command":"…"}]` 这种裸 JSON）。这不该当回答留在屏幕上，
+    /// 否则用户看到的是一堆乱码，还以为壳坏了。
+    static let toolCallHint = "[电脑把工具调用写成了文本，这一轮没执行成功，重发一次试试]"
+    static func looksLikeToolCall(_ t: String) -> Bool {
+        let s = t.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty, s.count < 2000 else { return false }
+        if s.hasPrefix("<tool_call>") || s.hasPrefix("<tools>") { return true }
+        if s.hasPrefix("[{") || s.hasPrefix("{") {
+            let marks = ["\"type\"", "\"name\"", "\"function\"", "\"arguments\""]
+            return marks.contains { s.contains($0) }
+        }
+        return false
+    }
+
     init() {
         let s = UserDefaults.standard.string(forKey: ChatVM.serverKey) ?? ""
         server = s.isEmpty ? ChatVM.defaultServer : ChatVM.normalize(s)
@@ -259,6 +274,7 @@ final class ChatVM: ObservableObject {
                     // 播不播由用户这句话的意图决定（fireMusic），不再等电脑给钥匙。
                     var t = text
                     if let tag = MusicVM.parseMusicTag(t) { t = tag.cleaned }
+                    if Self.looksLikeToolCall(t) { t = Self.toolCallHint }
                     self.msgs[i].text = t
                     self.fireMusic(replyText: t)
                 }
@@ -270,6 +286,9 @@ final class ChatVM: ObservableObject {
                     if let tag = MusicVM.parseMusicTag(finalText) {
                         finalText = tag.cleaned
                         self.msgs[i].text = finalText
+                    }
+                    if Self.looksLikeToolCall(self.msgs[i].text) {
+                        self.msgs[i].text = Self.toolCallHint      // 别把 JSON 当回答留在屏幕上
                     }
                     self.fireMusic(replyText: self.msgs[i].text)
                     if self.msgs[i].text.isEmpty { self.msgs[i].text = "[ 电脑没有返回内容 ]" }
