@@ -176,7 +176,7 @@ final class ChatVM: ObservableObject {
     /// 发一句话给电脑。返回 false = 这一句被挡下了（上一轮还没收尾），调用方要知道，
     /// 否则通话页会一直停在"思考中"等一个永远不会来的回答。
     @discardableResult
-    func send(_ text: String) -> Bool {
+    func send(_ text: String, voice: Bool = false) -> Bool {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty, !busy else { return false }
         input = ""
@@ -207,7 +207,9 @@ final class ChatVM: ObservableObject {
         if !prior.isEmpty { prior.removeLast() }
         let hist: [[String: String]] = prior.suffix(24)
             .map { ["role": $0.role == .user ? "user" : "assistant", "content": $0.text] }
-        let body: [String: Any] = ["text": t, "messages": hist]
+        // voice=true：语音通话进来的句子。电脑端据此走"语音快通道"（短提示词、限长输出），
+        // 否则会被 6856 字的期货提示词拖到 30~120 秒（35B 全 CPU，prefill 只有 31 tok/s）。
+        let body: [String: Any] = ["text": t, "messages": hist, "voice": voice]
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         // v2.1 轮询模式：POST /chat 秒回任务号，再每 1.5 秒 GET /poll?id=N 取结果。

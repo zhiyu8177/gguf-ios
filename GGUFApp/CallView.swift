@@ -150,7 +150,7 @@ final class CallVM: ObservableObject {
         errStreak = 0
         // 【2026-11-18】send 现在会返回"这一句有没有发出去"。以前是静默丢弃，
         // 而这里已经把状态置成 .thinking，于是通话页永远卡在"思考中"，等一个不会来的回答。
-        guard chat.send(t) else {
+        guard chat.send(t, voice: true) else {
             hint = "电脑还忙着上一轮，稍等一下"
             scheduleListenRetry()
             return
