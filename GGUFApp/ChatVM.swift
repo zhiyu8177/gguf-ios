@@ -33,6 +33,8 @@ final class ChatVM: ObservableObject {
     private var probeQueue: [String] = []
     /// 是否正在跑一轮探测，防定时器叠加
     private var probing = false
+    /// 本轮轮询的起等时间
+    private var pollStartedAt: Date?
     /// 【v3】本轮是否已处理过音乐（每轮 send 重置，防 poll 重复触发）
     private var musicFired = false
     /// 【v3】本轮用户话里的音乐意图（send 时解析；手机据此自己点歌，不依赖电脑标记）
@@ -213,6 +215,7 @@ final class ChatVM: ObservableObject {
     private func startPolling(_ aiID: UUID) {
         pollTimer?.invalidate()
         pollFails = 0
+        pollStartedAt = Date()          // 起等时间，用于"电脑端静默丢消息"的超时兜底
         musicFired = false
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
             self?.pollOnce(aiID)
@@ -242,6 +245,15 @@ final class ChatVM: ObservableObject {
             let text = (obj["text"] as? String) ?? ""
             DispatchQueue.main.async {
                 guard let i = self.msgs.firstIndex(where: { $0.id == aiID }) else { return }
+                // 【2026-11-18 超时兜底】电脑端在"上一轮还没收尾"的瞬间会把新消息静默丢掉
+                // （gui.cpp: if (g_busy) return;），这条 id 永远不会 done，手机就卡在空泡里
+                // 一直转。等满 150 秒还没有一个字，就明确报错并放开输入框，别让人对着空泡干等。
+                if !done, self.msgs[i].text.isEmpty,
+                   let t0 = self.pollStartedAt, Date().timeIntervalSince(t0) > 150 {
+                    self.pollTimer?.invalidate()
+                    self.fail(aiID, "电脑端没接住这条（上一轮还没收尾时会被丢），划掉 App 重开再发一次")
+                    return
+                }
                 if !text.isEmpty {
                     // 电脑端老版本仍可能塞 [music:..] 标记：只负责把标记剥干净再显示，
                     // 播不播由用户这句话的意图决定（fireMusic），不再等电脑给钥匙。
