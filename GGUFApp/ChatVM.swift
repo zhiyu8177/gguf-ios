@@ -46,17 +46,28 @@ final class ChatVM: ObservableObject {
     /// 【2026-11-18 适配 35B 部署】电脑局域网 IP 会变，旧默认 172.16.2.103 已不在本机网卡上，
     /// 健康检查失败就顺着候选列表往下试，试通哪个就钉住哪个 —— 换网/换机器不用再重打壳。
     static let candidates = [
-        "http://192.168.1.7:8099",    // 本机无线，同一 Wi-Fi 直连（2026-11-18 实测通，最快）
-        "http://172.16.3.222:8099",   // 蒲公英 VPN，出门/4G 也连得上（同日实测通）
+        "http://172.16.3.222:8099",   // 蒲公英 VPN，Windows 防火墙里 ORAY_VPN_Firewall_Rule 对它整段放行（2026-11-18 实测通）
+        "http://192.168.1.7:8099",    // 本机无线：同 Wi-Fi 直连，但 WLAN 是"公用"网络，没有放行规则会被防火墙拦
         "http://172.16.2.248:8099",   // 以太网 2（当前不通，留作备用）
         "http://172.16.2.103:8099",   // 旧默认地址，已失效，仅兜底
     ]
     static let defaultServer = candidates[0]
+
+    /// 地址统一收口：去空格、补 http://、去结尾多余的斜杠。
+    /// 2026-11-18 实测：地址带尾斜杠时 /health 返回 404，壳会一直两个红灯，
+    /// 用户完全看不出是自己多打了一个"/"。
+    static func normalize(_ raw: String) -> String {
+        var v = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !v.isEmpty else { return v }
+        if !v.hasPrefix("http://") && !v.hasPrefix("https://") { v = "http://" + v }
+        while v.hasSuffix("/") { v.removeLast() }
+        return v
+    }
     private static let serverKey = "wuj_server_v3"   // 换 key：老包里存的失效地址不再生效
 
     init() {
         let s = UserDefaults.standard.string(forKey: ChatVM.serverKey) ?? ""
-        server = s.isEmpty ? ChatVM.defaultServer : s
+        server = s.isEmpty ? ChatVM.defaultServer : ChatVM.normalize(s)
         MusicVM.globalServer = server          // 播放器要拿 8321 地址
         MusicVM.prepareSession()               // 启动就把音频会话备好
     }
@@ -66,10 +77,8 @@ final class ChatVM: ObservableObject {
     // MARK: - 服务地址
 
     func saveServer(_ s: String) {
-        let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty else { return }
-        var v = t
-        if !v.hasPrefix("http://") && !v.hasPrefix("https://") { v = "http://" + v }
+        let v = ChatVM.normalize(s)            // 去空格 / 补 http:// / 去掉结尾斜杠
+        guard !v.isEmpty else { return }
         server = v
         MusicVM.globalServer = v               // 聊天点歌桥：地址改了同步给 MusicVM.shared
         UserDefaults.standard.set(v, forKey: ChatVM.serverKey)
