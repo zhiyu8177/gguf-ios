@@ -29,6 +29,10 @@ final class ChatVM: ObservableObject {
     private var pollTimer: Timer?
     private var pollID: UInt64 = 0
     private var pollFails = 0
+    /// 待探测的服务地址队列（只在主线程读写）
+    private var probeQueue: [String] = []
+    /// 是否正在跑一轮探测，防定时器叠加
+    private var probing = false
     /// 【v3】本轮是否已处理过音乐（每轮 send 重置，防 poll 重复触发）
     private var musicFired = false
     /// 【v3】本轮用户话里的音乐意图（send 时解析；手机据此自己点歌，不依赖电脑标记）
@@ -39,8 +43,16 @@ final class ChatVM: ObservableObject {
     private var wantSong: String? = nil
     private var player: AVAudioPlayer?
 
-    static let defaultServer = "http://172.16.2.103:8099"
-    private static let serverKey = "wuj_server_v2"
+    /// 【2026-11-18 适配 35B 部署】电脑局域网 IP 会变，旧默认 172.16.2.103 已不在本机网卡上，
+    /// 健康检查失败就顺着候选列表往下试，试通哪个就钉住哪个 —— 换网/换机器不用再重打壳。
+    static let candidates = [
+        "http://192.168.1.7:8099",    // 本机无线，同一 Wi-Fi 直连（2026-11-18 实测通，最快）
+        "http://172.16.3.222:8099",   // 蒲公英 VPN，出门/4G 也连得上（同日实测通）
+        "http://172.16.2.248:8099",   // 以太网 2（当前不通，留作备用）
+        "http://172.16.2.103:8099",   // 旧默认地址，已失效，仅兜底
+    ]
+    static let defaultServer = candidates[0]
+    private static let serverKey = "wuj_server_v3"   // 换 key：老包里存的失效地址不再生效
 
     init() {
         let s = UserDefaults.standard.string(forKey: ChatVM.serverKey) ?? ""
@@ -77,25 +89,60 @@ final class ChatVM: ObservableObject {
     // MARK: - 健康检查
 
     func checkHealth() {
-        guard let url = URL(string: server + "/health") else {
-            engineOK = false; ttsOK = false; return
+        guard !probing else { return }        // 上一轮还没探完就别叠上去（4 个地址最坏 24 秒）
+        probing = true
+        probeQueue = [server] + ChatVM.candidates.filter { $0 != server }
+        probeNext()
+    }
+
+    /// 顺着候选地址探测：当前地址通了就用它；不通就换下一个，通了立刻钉住并落盘。
+    private func probeNext() {
+        guard !probeQueue.isEmpty else {
+            probing = false
+            engineOK = false; ttsOK = false
+            return
+        }
+        let base = probeQueue.removeFirst()
+        guard let url = URL(string: base + "/health") else {
+            probeNext()
+            return
         }
         var req = URLRequest(url: url)
         req.timeoutInterval = 6
         req.cachePolicy = .reloadIgnoringLocalCacheData
         URLSession.shared.dataTask(with: req) { [weak self] data, _, err in
-            var e = false, t = false
+            guard let self = self else { return }
+            var e = false, t = false, model = ""
             if let d = data, err == nil,
                let obj = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] {
                 let eng = obj["engine"] as? String ?? ""
                 e = (eng == "online" || eng == "standby")
                 t = (obj["tts"] as? Bool) ?? false
+                model = obj["model"] as? String ?? ""
             }
             DispatchQueue.main.async {
-                self?.engineOK = e
-                self?.ttsOK = t
+                if e {
+                    self.probing = false
+                    if base != self.server {
+                        self.server = base
+                        MusicVM.globalServer = base
+                        UserDefaults.standard.set(base, forKey: ChatVM.serverKey)
+                    }
+                    self.engineOK = true
+                    self.ttsOK = t
+                    self.noteModel(model)
+                } else {
+                    self.probeNext()
+                }
             }
         }.resume()
+    }
+
+    /// 首行标语后面挂上电脑当前真实在跑的模型名，避免"以为还在 80B"这种糊涂账。
+    private func noteModel(_ m: String) {
+        guard !m.isEmpty, let i = msgs.firstIndex(where: { $0.role == .sys }) else { return }
+        let line = "[ 手机直连 AgentShell · 原生界面 · " + m + " ]"
+        if msgs[i].text != line { msgs[i].text = line }
     }
 
     // MARK: - 发消息（流式）
