@@ -33,6 +33,7 @@ final class VoiceIO: ObservableObject {
     // 服务器模式：AVAudioRecorder 直接出 16k 单声道 WAV
     private var recorder: AVAudioRecorder?
     private var recURL: URL?
+    private var clipStart: Date?          // 本段录音起点：断句时判断片段是否太短
     // 免提模式静音断句（VAD）：用录音电平检测“说完一句”，静音 1.2 秒立刻上传
     private var meterTimer: Timer?
     private var speechSeen = false
@@ -85,6 +86,7 @@ final class VoiceIO: ObservableObject {
             r.record()
             recorder = r
             recURL = url
+            clipStart = Date()
             // 免提模式：电平 VAD 断句（说完静音 1.2s 立刻发）+ 15s 兜底上限
             if maxListenSeconds != nil {
                 startVAD()
@@ -167,8 +169,10 @@ final class VoiceIO: ObservableObject {
         }
     }
 
-    /// 免提通话断句：录音电平 > -38dB 视为在说话；说完连续静音 1.2 秒自动结束上传。
-    /// （只有免提模式启用；按住说话不受影响，仍以松手为准）
+    /// 免提通话断句：录音电平 > -45dB 视为在说话；说完连续静音 1.8 秒自动结束上传。
+    /// 【2026-11-18 修】原来阈值 -38dB / 静音 1.2 秒，实测把一句"在吗"切成 2.2 秒的碎块，
+    /// FunASR 对这么短又偏安静的音频直接返回空串 → 通话页一直"聆听中"、说话没反应。
+    /// 现在：阈值放宽到 -45dB、静音拉到 1.8 秒，且片段不足 2.5 秒时不切、继续录。
     private func startVAD() {
         speechSeen = false
         quietTicks = 0
@@ -177,12 +181,18 @@ final class VoiceIO: ObservableObject {
             guard let self = self, self.active, let r = self.recorder else { return }
             r.updateMeters()
             let db = r.averagePower(forChannel: 0)
-            if db > -38 {
+            if db > -45 {
                 self.speechSeen = true
                 self.quietTicks = 0
             } else if self.speechSeen {
                 self.quietTicks += 1
-                if self.quietTicks >= 12 {
+                if self.quietTicks >= 18 {
+                    // 片段太短就别急着上传（短音频识别不出，等于白跑一趟），继续录
+                    let clip = Date().timeIntervalSince(self.clipStart ?? Date())
+                    if clip < 2.5 {
+                        self.quietTicks = 0
+                        return
+                    }
                     self.meterTimer?.invalidate()
                     self.meterTimer = nil
                     self.finishUpload()

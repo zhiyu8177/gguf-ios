@@ -89,7 +89,13 @@ final class CallVM: ObservableObject {
         voice.serverURL = chat.server      // v2.3 录音上传电脑 FunASR
         voice.onPartial = { [weak self] t in self?.liveText = t }
         voice.onText = { [weak self] t in self?.userSaid(t) }
-        voice.onError = { [weak self] _ in self?.scheduleListenRetry() }
+        voice.onError = { [weak self] msg in
+            // 【2026-11-18】原来把 msg 直接丢掉、只闷头重试，屏幕上一点线索都没有，
+            // 用户体验就是"一直聆听中、说话没反应"。现在把真实原因显示出来。
+            guard let self = self, !self.stopped else { return }
+            self.hint = msg
+            self.scheduleListenRetry()
+        }
         chat.onReplyDone = { [weak self] reply in self?.aiReplied(reply) }
 
         let s = AVAudioSession.sharedInstance()
@@ -142,12 +148,14 @@ final class CallVM: ObservableObject {
     private func userSaid(_ t: String) {
         guard !stopped else { return }
         errStreak = 0
-        guard !chat.busy else {
-            scheduleListenRetry()      // 引擎忙（理论上不会走到，兜底）
+        // 【2026-11-18】send 现在会返回"这一句有没有发出去"。以前是静默丢弃，
+        // 而这里已经把状态置成 .thinking，于是通话页永远卡在"思考中"，等一个不会来的回答。
+        guard chat.send(t) else {
+            hint = "电脑还忙着上一轮，稍等一下"
+            scheduleListenRetry()
             return
         }
         state = .thinking
-        chat.send(t)
     }
 
     // MARK: 电脑答完
@@ -160,6 +168,7 @@ final class CallVM: ObservableObject {
             return
         }
         lastReply = reply
+        hint = ""
         state = .speaking
         let sp = CallSpeaker()
         speaker = sp

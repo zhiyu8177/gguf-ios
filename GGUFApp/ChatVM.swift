@@ -173,9 +173,12 @@ final class ChatVM: ObservableObject {
 
     // MARK: - 发消息（流式）
 
-    func send(_ text: String) {
+    /// 发一句话给电脑。返回 false = 这一句被挡下了（上一轮还没收尾），调用方要知道，
+    /// 否则通话页会一直停在"思考中"等一个永远不会来的回答。
+    @discardableResult
+    func send(_ text: String) -> Bool {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty, !busy else { return }
+        guard !t.isEmpty, !busy else { return false }
         input = ""
         busy = true
         // 【v3】先看用户这句话要不要放歌——手机自己决定，不等电脑给标记
@@ -192,7 +195,7 @@ final class ChatVM: ObservableObject {
 
         guard let url = URL(string: server + "/chat") else {
             fail(aiID, "电脑地址不对，点右上角齿轮改地址")
-            return
+            return false
         }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -225,6 +228,7 @@ final class ChatVM: ObservableObject {
             self.pollID = id
             DispatchQueue.main.async { self.startPolling(aiID) }
         }.resume()
+        return true
     }
 
     private func startPolling(_ aiID: UUID) {
