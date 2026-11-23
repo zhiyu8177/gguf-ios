@@ -33,6 +33,8 @@ final class ChatVM: ObservableObject {
     private var probeQueue: [String] = []
     /// 是否正在跑一轮探测，防定时器叠加
     private var probing = false
+    /// 刚探不通的地址：外网状态下每 5 秒白等 6 秒超时太浪费，记下来 2 分钟内先跳过
+    private var deadUntil: [String: Date] = [:]
     /// 本轮轮询的起等时间
     private var pollStartedAt: Date?
     /// 【v3】本轮是否已处理过音乐（每轮 send 重置，防 poll 重复触发）
@@ -48,10 +50,10 @@ final class ChatVM: ObservableObject {
     /// 【2026-11-18 适配 35B 部署】电脑局域网 IP 会变，旧默认 172.16.2.103 已不在本机网卡上，
     /// 健康检查失败就顺着候选列表往下试，试通哪个就钉住哪个 —— 换网/换机器不用再重打壳。
     static let candidates = [
-        "http://172.16.3.222:8099",   // 蒲公英 VPN，Windows 防火墙里 ORAY_VPN_Firewall_Rule 对它整段放行（2026-11-18 实测通）
-        "http://192.168.1.7:8099",    // 本机无线：同 Wi-Fi 直连，但 WLAN 是"公用"网络，没有放行规则会被防火墙拦
+        "http://192.168.137.72:8099", // 手机热点/同一局域网：内网直连，最快（看片走这条才不卡）
+        "http://172.16.3.222:8099",   // 蒲公英 VPN：人在外面才走这条，经 Oray 中转，比内网慢
+        "http://192.168.1.7:8099",    // 旧无线地址（留作备用）
         "http://172.16.2.248:8099",   // 以太网 2（当前不通，留作备用）
-        "http://172.16.2.103:8099",   // 旧默认地址，已失效，仅兜底
     ]
     static let defaultServer = candidates[0]
 
@@ -117,11 +119,16 @@ final class ChatVM: ObservableObject {
     func checkHealth() {
         guard !probing else { return }        // 上一轮还没探完就别叠上去（4 个地址最坏 24 秒）
         probing = true
-        probeQueue = [server] + ChatVM.candidates.filter { $0 != server }
+        // 【v2.8 内网优先】按候选表顺序依次探，内网地址排第一：在家/同热点就直接钉内网，
+        // 只有内网探不通（人在外面）才落到蒲公英。当前地址不在表里时放最后兜底。
+        var q = ChatVM.candidates
+        if !q.contains(server) { q.append(server) }
+        probeQueue = q
         probeNext()
     }
 
-    /// 顺着候选地址探测：当前地址通了就用它；不通就换下一个，通了立刻钉住并落盘。
+    /// 顺着候选地址探测：按表顺序（内网在前）试，第一个探通的就钉住并落盘；
+    /// 全都不通才熄灭两个状态灯。
     private func probeNext() {
         guard !probeQueue.isEmpty else {
             probing = false
@@ -129,6 +136,11 @@ final class ChatVM: ObservableObject {
             return
         }
         let base = probeQueue.removeFirst()
+        // 内网地址刚探失败过（说明人在外面），2 分钟内先跳过；正在用的地址不跳过
+        if base != server, let until = deadUntil[base], until > Date() {
+            probeNext()
+            return
+        }
         guard let url = URL(string: base + "/health") else {
             probeNext()
             return
@@ -149,6 +161,7 @@ final class ChatVM: ObservableObject {
             DispatchQueue.main.async {
                 if e {
                     self.probing = false
+                    self.deadUntil.removeValue(forKey: base)
                     if base != self.server {
                         self.server = base
                         MusicVM.globalServer = base
@@ -158,6 +171,7 @@ final class ChatVM: ObservableObject {
                     self.ttsOK = t
                     self.noteModel(model)
                 } else {
+                    if base != self.server { self.deadUntil[base] = Date().addingTimeInterval(120) }
                     self.probeNext()
                 }
             }
