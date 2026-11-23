@@ -1,4 +1,5 @@
 import SwiftUI
+import SafariServices   // 影视库：应用内打开网页（SFSafariViewController）
 
 // 深色主题色板（对齐原壳观感）
 enum T {
@@ -24,6 +25,7 @@ struct ChatView: View {
     @State private var showSettings = false
     @State private var showCall = false
     @State private var showMusic = false
+    @State private var showMovie = false   // 影视库（LibreTV）
     @State private var autoReadBeforeCall = true
     @State private var holding = false
     @State private var toastText: String = ""
@@ -72,6 +74,8 @@ struct ChatView: View {
             Text("AgentShell 直连")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundColor(T.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)   // 顶栏多了一个"电影"按钮，宁可字缩一点也不要换行
             // 版本动态读 Info.plist（v2.6 起不再手改这里，v2.5 就是手改漏掉导致"装了新版显示旧版"）
             // build 号也显示出来：r3 和 v2.6 界面原本一模一样，装没装上新包根本没法验证
             Text("v" + (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")
@@ -82,6 +86,16 @@ struct ChatView: View {
 
             dot(vm.engineOK); Text("引擎").font(.system(size: 10)).foregroundColor(T.dim)
             dot(vm.ttsOK).padding(.leading, 6); Text("语音").font(.system(size: 10)).foregroundColor(T.dim)
+
+            // 影视库：一键进 LibreTV，不用记地址。打开的是电脑端 /movie，
+            // 它会按请求自己的 Host 跳到对应网段的 8899（局域网 / 蒲公英都行）
+            Button(action: { showMovie = true }) {
+                Image(systemName: "film.fill")
+                    .font(.system(size: 15))
+                    .foregroundColor(T.cyan)
+            }
+            .accessibilityLabel("看电影")
+            .sheet(isPresented: $showMovie) { WebSheet(url: movieURL) }
 
             // 手机音频自检：听到"嘀"= 音频输出正常；听不到 = 静音拨片/音量/蓝牙跑偏
             Button(action: {
@@ -273,6 +287,13 @@ struct ChatView: View {
 
     // MARK: - 行为
 
+    /// 影视库地址：跟着当前电脑地址走（去尾斜杠再拼 /movie），换电脑/换网段都不用改
+    private var movieURL: URL {
+        var base = vm.server.trimmingCharacters(in: .whitespacesAndNewlines)
+        while base.hasSuffix("/") { base.removeLast() }
+        return URL(string: base + "/movie") ?? URL(string: "http://192.168.137.72:8099/movie")!
+    }
+
     private func setup() {
         vm.start()
         voice.serverURL = vm.server          // v2.3 录音上传电脑 FunASR
@@ -430,6 +451,17 @@ struct SettingsView: View {
         }
         .onAppear { addr = vm.server }
     }
+}
+
+/// 影视库用的应用内网页：底部有"完成"，随时退回聊天页
+struct WebSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
 
 // MARK: - 入口
